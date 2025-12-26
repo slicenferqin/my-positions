@@ -1,88 +1,88 @@
-# My Positions - 基金持仓实时估值与 AI 资讯助手
+# My Positions 📈
 
-这是一个基于 React 和 Python 的个人基金持仓追踪与实时资讯分析工具。它不仅能帮助你实时监控基金估值和收益，还能利用 AI 自动分析财经新闻对你持仓的具体影响。
+A sophisticated personal fund tracking and analysis dashboard that combines real-time valuation with AI-powered market intelligence.
 
-## ✨ 主要功能
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![React](https://img.shields.io/badge/react-18.x-61DAFB.svg?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-5.x-3178C6.svg?logo=typescript&logoColor=white)
+![Python](https://img.shields.io/badge/python-3.8+-3776AB.svg?logo=python&logoColor=white)
 
-### 📊 智能持仓追踪
-- **实时估值**：基于基金持仓股票的实时行情，计算基金的盘中实时估值（无需等待官方净值更新）。
-- **收益分析**：直观展示当日收益、持有收益、收益率等核心指标。
-- **可视化图表**：每日收益走势图，清晰记录资产变化。
-- **市场概览**：实时显示上证指数、创业板指等核心市场指数。
+## Overview
 
-### 🤖 AI 驱动的财经资讯
-- **7x24快讯**：接入财联社实时电报，秒级更新全球财经资讯。
-- **持仓穿透分析**：自动分析新闻内容与你持仓基金的前十大重仓股的关联。
-- **AI 深度解读**：
-  - 自动识别与持仓相关的重大新闻。
-  - 调用本地 AI (Claude) 进行深度分析。
-  - 给出明确的**利好/利空/中性**判断及简短理由。
-  - 支持 Markdown 格式渲染，阅读体验佳。
-- **智能筛选**：支持按“持仓相关”、“重要性”及自定义标签筛选新闻。
+**My Positions** is designed for investors who want more than just static net value updates. It provides real-time intraday valuation estimates for mutual funds based on their underlying stock holdings and utilizes local AI (Claude) to analyze how breaking news impacts your specific portfolio.
 
-## 🛠️ 技术栈
+## ✨ Key Features
 
-- **前端**：React 18, TypeScript, Vite, CSS Modules
-- **后端 (AI Proxy)**：Python, Flask
-- **AI 引擎**：本地 Claude CLI (通过 Python 后端调用)
+### 📊 Real-time Portfolio Tracking
+*   **Intraday Valuation**: Estimates fund net value in real-time during trading hours based on stock holdings.
+*   **Performance Metrics**: Track daily gains, total return, and holding yields at a glance.
+*   **Visual Analytics**: Interactive charts for daily profit trends and asset distribution.
+*   **Market Pulse**: Real-time monitoring of major indices (Shanghai Composite, ChiNext, etc.).
 
-## 🚀 快速开始
+### 🤖 AI-Powered Intelligence
+*   **Smart News Feed**: Aggregates 24/7 financial news from Cailian Press (财联社).
+*   **Portfolio Relevance**: Automatically identifies news affecting your specific holdings (penetrating to stock level).
+*   **AI Analysis**:
+    *   **Impact Assessment**: Classifies news as Bullish (利好), Bearish (利空), or Neutral.
+    *   **Reasoning**: Provides concise, logic-based explanations for the assessment.
+    *   **Holdings Linkage**: Explicitly points out which of your funds/stocks are affected.
 
-### 前置要求
-1. Node.js (v16+)
-2. Python (v3.8+)
-3. [Claude CLI](https://github.com/anthropics/claude-code) (需安装并完成登录验证)
+## 🛠 Tech Stack
 
-### 1. 启动后端服务 (AI Proxy)
+*   **Frontend**: React 18, TypeScript, Vite, CSS Modules
+*   **Backend / AI Proxy**: Python, Flask
+*   **AI Engine**: Local Claude CLI (Anthropic)
+*   **Data Sources**: EastMoney (Fund/Stock data), Cailian Press (News)
 
-后端服务用于桥接前端与本地 Claude CLI，实现 AI 分析功能。
+## 🚀 Getting Started
+
+### Prerequisites
+
+*   Node.js (v16+)
+*   Python (v3.8+)
+*   [Claude CLI](https://github.com/anthropics/claude-code) (installed and authenticated)
+
+### 1. Start the AI Proxy Server
+
+The Python backend acts as a bridge between the frontend and your local Claude CLI for secure, unlimited analysis.
 
 ```bash
-# 进入 server 目录
 cd server
 
-# 创建并激活虚拟环境
+# Create and activate virtual environment
 python3 -m venv venv
-source venv/bin/activate  # macOS/Linux
-# venv\Scripts\activate   # Windows
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 
-# 启动服务 (默认端口 5000)
+# Run the server (default port: 5000)
 python app.py
 ```
 
-### 2. 启动前端应用
+### 2. Start the Frontend Application
 
 ```bash
-# 回到项目根目录
-cd ..
-
-# 安装依赖
+# In the project root
 npm install
 
-# 启动开发服务器
+# Start development server
 npm run dev
 ```
 
-打开浏览器访问 `http://localhost:3000` 即可使用。
+Visit `http://localhost:3000` to access the dashboard.
 
-## 📝 使用指南
+## 📖 Usage Guide
 
-1. **添加持仓**：在“我的持仓”页签，点击“添加基金”，输入基金代码（如 000001）、持有份额和持仓成本。
-2. **查看资讯**：切换到“7x24快讯”页签。
-3. **AI 分析**：
-   - 系统会自动识别与你持仓相关的重要新闻。
-   - 被识别为“持仓相关”的新闻会自动触发 AI 分析。
-   - 分析结果将直接显示在新闻卡片下方，包含利好/利空判断及理由。
+1.  **Add Funds**: Go to the "Positions" tab, click "Add Fund", and enter the fund code (e.g., `000001`), shares held, and cost.
+2.  **Monitor**: Watch real-time valuations change during trading hours.
+3.  **News & AI**: Switch to the "News" tab. The system will automatically highlight news related to your holdings and generate AI analysis cards for significant events.
 
-## ⚠️ 注意事项
+## ⚠️ Disclaimer
 
-- 本项目依赖本地 `claude` 命令行工具进行 AI 对话，请确保终端中可以直接运行 `claude` 命令。
-- 基金估值仅供参考，实际净值以基金公司公布为准。
-- 投资有风险，AI 分析结果仅作为辅助参考，不构成投资建议。
+*   **Investment Risk**: All data and AI analyses are for reference only. Market data may have delays. This tool does not constitute investment advice.
+*   **Data Accuracy**: Fund valuations are estimates based on disclosed quarterly holdings and may differ from actual net values due to position adjustments by fund managers.
 
 ## 📄 License
 
-MIT
+This project is licensed under the MIT License.
