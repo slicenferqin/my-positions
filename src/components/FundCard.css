@@ -1,0 +1,174 @@
+.fund-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.fund-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.fund-card.loading {
+  opacity: 0.7;
+}
+
+.fund-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.fund-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fund-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.fund-code {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.remove-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.remove-btn:hover {
+  background: #ff4d4f;
+  color: white;
+}
+
+.fund-estimation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.estimation-value {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.estimation-value .label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.estimation-value .value {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.estimation-change {
+  text-align: right;
+}
+
+.change-percent {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.fund-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.fund-nav .label {
+  margin-right: auto;
+}
+
+.fund-nav .value {
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.nav-date {
+  font-size: 12px;
+}
+
+.fund-position {
+  padding: 12px 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.position-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.position-row .label {
+  color: var(--text-secondary);
+}
+
+.position-row .value {
+  font-weight: 500;
+}
+
+.position-row .value small {
+  font-size: 12px;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
+.fund-update-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: right;
+  margin-top: 8px;
+}
+
+.fund-error {
+  padding: 20px;
+  text-align: center;
+  color: var(--danger-color);
+  font-size: 14px;
+}
+
+.fund-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* 涨跌颜色 */
+.rise {
+  color: var(--danger-color) !important;
+}
+
+.fall {
+  color: var(--success-color) !important;
+}
+
+.flat {
+  color: var(--text-secondary) !important;
+}

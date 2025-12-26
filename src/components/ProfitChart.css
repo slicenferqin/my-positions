@@ -1,0 +1,247 @@
+.profit-chart {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 24px;
+  border: 1px solid var(--border-color);
+  overflow-x: auto; /* Allow horizontal scroll on small screens */
+}
+
+.profit-chart.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+}
+
+.profit-chart .empty-message {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.profit-chart .empty-message span {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.profit-chart .empty-message p {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.profit-chart .empty-message small {
+  font-size: 12px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.chart-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.period-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.stat-item .stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.stat-item .stat-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stat-item .stat-value.rise {
+  color: var(--rise-color);
+}
+
+.stat-item .stat-value.fall {
+  color: var(--fall-color);
+}
+
+/* Calendar Styles */
+.calendar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  width: fit-content;
+  margin: 0 auto; /* Center it */
+}
+
+.month-labels {
+  position: relative;
+  height: 16px;
+  margin-bottom: 4px;
+  margin-left: 20px; /* Offset for weekday labels */
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.month-label {
+  position: absolute;
+  white-space: nowrap;
+}
+
+.calendar-grid {
+  display: flex;
+  gap: 4px;
+}
+
+.weekday-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-top: 0; /* Align with cells */
+  gap: 4px; /* Match cell gap */
+  margin-right: 4px;
+}
+
+.weekday-labels span {
+  font-size: 9px;
+  color: var(--text-muted);
+  height: 12px;
+  line-height: 12px;
+  width: 12px;
+  text-align: right;
+  display: block;
+}
+
+.weeks-container {
+  display: flex;
+  gap: 4px;
+}
+
+.week-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.day-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background-color: var(--bg-secondary); /* Default empty color */
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.1s;
+}
+
+.day-cell:hover {
+  transform: scale(1.4);
+  z-index: 10;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.day-cell.future {
+  background-color: transparent;
+  pointer-events: none;
+  border: 1px dashed var(--border-color);
+  opacity: 0.3;
+}
+
+.day-cell.zero {
+  background-color: var(--bg-secondary);
+}
+
+/* Colors - Assuming Rise=Red, Fall=Green */
+/* Use CSS variables if possible, but hardcoding opacity steps for now based on theme vars usually having RGB */
+
+/* Fall (Green) */
+.day-cell.fall-1 { background-color: rgba(7, 193, 96, 0.2); }
+.day-cell.fall-2 { background-color: rgba(7, 193, 96, 0.4); }
+.day-cell.fall-3 { background-color: rgba(7, 193, 96, 0.7); }
+.day-cell.fall-4 { background-color: rgba(7, 193, 96, 1.0); }
+
+/* Rise (Red) */
+.day-cell.rise-1 { background-color: rgba(255, 77, 79, 0.2); }
+.day-cell.rise-2 { background-color: rgba(255, 77, 79, 0.4); }
+.day-cell.rise-3 { background-color: rgba(255, 77, 79, 0.7); }
+.day-cell.rise-4 { background-color: rgba(255, 77, 79, 1.0); }
+
+/* Legend */
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.legend-scale {
+  display: flex;
+  gap: 2px;
+}
+
+.scale-item {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+/* Reusing classes for legend items */
+.scale-item.zero { background-color: var(--bg-secondary); }
+.scale-item.fall-1 { background-color: rgba(7, 193, 96, 0.2); }
+.scale-item.fall-2 { background-color: rgba(7, 193, 96, 0.4); }
+.scale-item.fall-3 { background-color: rgba(7, 193, 96, 0.7); }
+.scale-item.fall-4 { background-color: rgba(7, 193, 96, 1.0); }
+.scale-item.rise-1 { background-color: rgba(255, 77, 79, 0.2); }
+.scale-item.rise-2 { background-color: rgba(255, 77, 79, 0.4); }
+.scale-item.rise-3 { background-color: rgba(255, 77, 79, 0.7); }
+.scale-item.rise-4 { background-color: rgba(255, 77, 79, 1.0); }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .period-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .calendar-container {
+    width: 100%;
+    overflow-x: auto;
+    align-items: flex-start; /* Left align on mobile scroll */
+    margin: 0;
+  }
+  
+  .month-labels {
+    margin-left: 16px; /* Adjust for sticky label */
+  }
+  
+  .weekday-labels {
+    position: sticky;
+    left: 0;
+    background: var(--bg-card);
+    z-index: 2;
+    padding-right: 4px;
+  }
+}

@@ -1,0 +1,103 @@
+.market-indices {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  /* 移除背景容器，改为单个卡片 */
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
+.market-indices.loading {
+  color: var(--text-muted);
+  font-size: 13px;
+  justify-content: center;
+  width: 100%;
+  padding: 20px;
+}
+
+.index-item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  min-width: 140px;
+  flex: 1;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.index-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.index-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.index-name {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.index-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.index-change-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.index-change {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.index-change.rise {
+  color: var(--rise-color);
+}
+
+.index-change.fall {
+  color: var(--fall-color);
+}
+
+/* 状态背景 */
+.index-item.rise-bg {
+  background: linear-gradient(to bottom right, #ffffff, #fff5f5);
+  border-color: rgba(255, 77, 79, 0.1);
+}
+
+.index-item.fall-bg {
+  background: linear-gradient(to bottom right, #ffffff, #f0fdf4);
+  border-color: rgba(39, 174, 96, 0.1);
+}
+
+@media (max-width: 640px) {
+  .market-indices {
+    gap: 10px;
+  }
+
+  .index-item {
+    flex: 1 1 45%;
+    min-width: auto;
+    padding: 10px;
+  }
+  
+  .index-price {
+    font-size: 16px;
+  }
+}

@@ -1,0 +1,211 @@
+.fund-table-container {
+  background: var(--bg-card);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.fund-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+
+.fund-table th {
+  background: var(--bg-primary);
+  padding: 16px;
+  text-align: right; /* Default to right for numeric columns */
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.fund-table th.col-name {
+  text-align: left;
+}
+
+.fund-table th.col-actions {
+  text-align: center;
+}
+
+.fund-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+}
+
+.fund-table th.sortable:hover {
+  color: var(--accent-color);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.fund-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  color: var(--text-primary);
+}
+
+.fund-table tbody tr {
+  transition: all 0.2s;
+}
+
+.fund-table tbody tr:hover {
+  background-color: var(--bg-primary);
+  cursor: pointer;
+}
+
+.fund-table tbody tr.expanded {
+  background-color: var(--bg-primary);
+}
+
+.fund-table tbody tr.expanded td {
+  border-bottom: none;
+}
+
+.fund-table tbody tr.detail-row:hover {
+  background-color: transparent;
+  cursor: default;
+}
+
+.fund-table tbody tr.detail-row td {
+  padding: 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.fund-table tbody tr.loading {
+  opacity: 0.6;
+}
+
+.fund-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 列宽度 */
+.col-name { width: 25%; min-width: 180px; }
+.col-nav { width: 15%; text-align: right; }
+.col-value { width: 15%; text-align: right; }
+.col-profit { width: 20%; text-align: right; }
+.col-today { width: 15%; text-align: right; }
+.col-actions { width: 10%; text-align: center; }
+
+/* 净值/涨跌合并列 */
+.nav-change-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.nav-change-cell .nav {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+.nav-change-cell .change {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.col-nav.rise .change {
+  color: var(--rise-color);
+  background-color: var(--rise-bg);
+}
+
+.col-nav.fall .change {
+  color: var(--fall-color);
+  background-color: var(--fall-bg);
+}
+
+.col-nav.flat .change {
+  color: var(--text-muted);
+}
+
+/* 基金名称单元格 */
+.fund-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fund-name-cell .name {
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.fund-name-cell .code {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+/* 按钮样式优化 */
+.col-actions {
+  white-space: nowrap;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  margin: 0 2px;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.05);
+  transform: scale(1.1);
+}
+
+.btn-edit:hover { color: var(--accent-color); }
+.btn-trade:hover { color: var(--fall-color); }
+.btn-remove:hover { color: var(--rise-color); }
+
+/* 数值字体 */
+.col-value, .col-profit, .col-today {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-profit small {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+/* 响应式 */
+@media (max-width: 900px) {
+  .fund-table {
+    font-size: 12px;
+  }
+
+  .fund-table th,
+  .fund-table td {
+    padding: 10px 8px;
+  }
+
+  .col-value,
+  .col-profit small {
+    display: none;
+  }
+}

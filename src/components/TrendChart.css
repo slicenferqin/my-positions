@@ -1,0 +1,81 @@
+.trend-chart {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+.trend-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+}
+
+.trend-info {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.max-label {
+  align-self: flex-start;
+}
+
+.min-label {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 10;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  backdrop-filter: blur(4px);
+}
+
+.chart-tooltip .tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.chart-tooltip .tooltip-value {
+  font-weight: 600;
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-tooltip .tooltip-value small {
+  font-size: 11px;
+  font-weight: 500;
+}

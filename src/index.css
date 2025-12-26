@@ -1,0 +1,139 @@
+:root {
+  /* 专业金融配色 - 优化版 */
+  --primary-color: #1a2a3a;
+  --primary-light: #2c3e50;
+  --accent-color: #2980b9;
+  
+  /* 涨跌颜色 - 鲜艳版 */
+  --rise-color: #ff4d4f;
+  --rise-bg: rgba(255, 77, 79, 0.08);
+  --fall-color: #27ae60;
+  --fall-bg: rgba(39, 174, 96, 0.08);
+  --flat-color: #95a5a6;
+
+  /* 文字颜色 */
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+
+  /* 背景和边框 */
+  --bg-primary: #f3f4f6;
+  --bg-secondary: #e5e7eb;
+  --bg-card: #ffffff;
+  --bg-hover: #f9fafb;
+  --border-color: #e5e7eb;
+  --border-dark: #d1d5db;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  /* 渐变 */
+  --gradient-header: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 涨跌颜色类 */
+.rise { color: var(--rise-color) !important; }
+.fall { color: var(--fall-color) !important; }
+.flat { color: var(--text-secondary) !important; }
+
+.rise-bg { background-color: var(--rise-bg); }
+.fall-bg { background-color: var(--fall-bg); }
+
+/* 按钮基础样式 */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+.btn-primary {
+  background: var(--accent-color);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-primary);
+}
+
+.btn-danger {
+  background: var(--rise-color);
+  color: white;
+}
+
+.btn-success {
+  background: var(--fall-color);
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 输入框样式 */
+input, select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-dark);
+  border-radius: 6px;
+  font-size: 13px;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-dark);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

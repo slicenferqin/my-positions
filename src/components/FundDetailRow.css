@@ -1,0 +1,149 @@
+
+.fund-detail-row-content {
+  display: flex;
+  gap: 24px;
+  padding: 16px 24px;
+  background-color: var(--bg-hover);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.detail-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.trend-chart-section {
+  flex: 1.5; /* Give more space to chart */
+}
+
+.chart-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  height: 144px; /* 120 + 24 padding */
+}
+
+.loading-chart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.detail-section h5 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 24px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-item .label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.info-item .value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.info-item .value small {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.info-item .value.rise {
+  color: var(--rise-color);
+}
+
+.info-item .value.fall {
+  color: var(--fall-color);
+}
+
+/* Transactions */
+.transaction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transaction-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.transaction-item:last-child {
+  border-bottom: none;
+}
+
+.transaction-item .type {
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.transaction-item .type.buy {
+  color: var(--rise-color);
+  background: rgba(231, 76, 60, 0.1);
+}
+
+.transaction-item .type.sell {
+  color: var(--fall-color);
+  background: rgba(46, 204, 113, 0.1);
+}
+
+.transaction-item .amount,
+.transaction-item .price {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.transaction-item .date {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.no-data {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .fund-detail-row-content {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .detail-section {
+    width: 100%;
+  }
+}

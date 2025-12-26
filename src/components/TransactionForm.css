@@ -1,0 +1,287 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.transaction-form {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow-md);
+}
+
+.form-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.transaction-form h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-primary);
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.tab-btn.active {
+  color: var(--text-primary);
+  background: var(--bg-card);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  font-weight: 500;
+}
+
+.history-list {
+  max-height: 400px;
+  overflow-y: auto;
+  min-height: 200px;
+}
+
+.no-history {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 0;
+  font-size: 13px;
+}
+
+.history-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.history-item:hover {
+  background: #e5e7eb;
+}
+
+.history-info {
+  flex: 1;
+}
+
+.history-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.history-type {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.history-type.buy {
+  color: var(--rise-color);
+  background: var(--rise-bg);
+}
+
+.history-type.sell {
+  color: var(--fall-color);
+  background: var(--fall-bg);
+}
+
+.history-shares {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.history-amount {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.history-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.history-note {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-delete {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-left: 8px;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.history-item:hover .btn-delete {
+  opacity: 1;
+}
+
+.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.current-position {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.type-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.type-btn {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid var(--border-dark);
+  background: var(--bg-card);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-btn.buy {
+  color: var(--rise-color);
+}
+
+.type-btn.sell {
+  color: var(--fall-color);
+}
+
+.type-btn.buy.active {
+  background: var(--rise-bg);
+  border-color: var(--rise-color);
+}
+
+.type-btn.sell.active {
+  background: var(--fall-bg);
+  border-color: var(--fall-color);
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-group {
+  flex: 1;
+}
+
+.form-group.full {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.form-group.amount {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.form-group input {
+  width: 100%;
+}
+
+.amount-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.form-error {
+  padding: 10px 12px;
+  background: var(--rise-bg);
+  border: 1px solid var(--rise-color);
+  border-radius: 6px;
+  color: var(--rise-color);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.form-actions .btn {
+  flex: 1;
+  padding: 12px;
+  justify-content: center;
+}

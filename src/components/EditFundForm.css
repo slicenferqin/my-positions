@@ -1,0 +1,142 @@
+.edit-fund-form {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow-lg);
+}
+
+.edit-fund-form h3 {
+  margin: 0 0 20px;
+  font-size: 16px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-fund-form .fund-code {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+.edit-fund-form .form-group {
+  margin-bottom: 16px;
+}
+
+.edit-fund-form .form-group label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.edit-fund-form .form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.edit-fund-form .form-group input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* 输入模式选择器 */
+.input-mode-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.mode-btn.active {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: white;
+}
+
+.calculated-info {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.calculated-info .label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.calculated-info .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.edit-fund-form .form-error {
+  color: var(--rise-color);
+  font-size: 13px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: rgba(231, 76, 60, 0.1);
+  border-radius: 4px;
+}
+
+.edit-fund-form .form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.edit-fund-form .btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.edit-fund-form .btn-secondary {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.edit-fund-form .btn-secondary:hover {
+  background: var(--border-color);
+}
+
+.edit-fund-form .btn-primary {
+  background: var(--accent-color);
+  color: white;
+}
+
+.edit-fund-form .btn-primary:hover {
+  background: #2980b9;
+}

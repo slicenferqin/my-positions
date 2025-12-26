@@ -1,0 +1,142 @@
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.update-time {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-right: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 图标按钮样式 */
+.icon-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: #e5e7eb;
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--bg-primary);
+}
+
+.icon-btn.primary {
+  background: var(--accent-color);
+  color: white;
+  box-shadow: 0 2px 4px rgba(52, 152, 219, 0.2);
+}
+
+.icon-btn.primary:hover:not(:disabled) {
+  background: #2980b9;
+  box-shadow: 0 4px 6px rgba(52, 152, 219, 0.3);
+}
+
+.icon-btn.danger {
+  color: var(--rise-color);
+  background: rgba(231, 76, 60, 0.1);
+}
+
+.icon-btn.danger:hover:not(:disabled) {
+  background: var(--rise-color);
+  color: white;
+}
+
+/* 旋转动画 */
+.icon-btn svg.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 悬停提示 */
+.icon-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: #1f2937;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  animation: fadeIn 0.2s forwards;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.icon-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #1f2937;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, 5px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .toolbar-left,
+  .toolbar-right {
+    width: 100%;
+    justify-content: center;
+  }
+}
