@@ -2,7 +2,7 @@ import { useState } from 'react'
 import './AddFundForm.css'
 
 interface AddFundFormProps {
-  onAdd: (fund: { code: string; name: string; shares: number; cost: number }) => Promise<void>
+  onAdd: (fund: { code: string; name?: string; shares: number; cost: number }) => Promise<void>
   onCancel: () => void
 }
 
@@ -41,7 +41,7 @@ export function AddFundForm({ onAdd, onCancel }: AddFundFormProps) {
     try {
       await onAdd({
         code: code.trim(),
-        name: name.trim(),
+        name: name.trim() || undefined,
         shares: sharesNum,
         cost: costNum,
       })

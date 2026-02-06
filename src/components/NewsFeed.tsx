@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { fetchNews, analyzePortfolio, fetchFundPortfolio, callAIAnalysis, generateSingleNewsAnalysisPrompt } from '@/services'
-import type { NewsItem, PortfolioAnalysis, FundWithEstimation, Stock } from '@/types'
+import { fetchNews, analyzePortfolio, fetchFundPortfolio } from '@/services'
+import type { NewsItem, PortfolioAnalysis, FundWithEstimation, Stock, WebhookConfig } from '@/types'
+import { DEFAULT_WEBHOOK_CONFIG } from '@/types'
+import { fetchWebhookConfig, updateWebhookConfig, testWebhook, refreshPortfolioRequest } from '@/services/api'
+import { useAuth } from '@/context/AuthContext'
 import './NewsFeed.css'
 
 function LiveClock() {
@@ -88,8 +91,8 @@ function NewsCard({ item, isNew, isHighlighted, sentiment, aiAnalysis, onTagClic
     const firstUrl = url.split(',')[0].trim()
     // 移除 URL 中的 query 参数
     const cleanUrl = firstUrl.split('?')[0]
-    // 提取路径部分
-    const path = cleanUrl.replace(/^https?:\/\/img\.cls\.cn/, '')
+    // 提取路径部分（支持 img.cls.cn 和 image.cls.cn）
+    const path = cleanUrl.replace(/^https?:\/\/(img|image)\.cls\.cn/, '')
     // 确保以 / 开头
     const safePath = path.startsWith('/') ? path : `/${path}`
     return `/img-proxy${safePath}`
@@ -196,6 +199,7 @@ interface NewsFeedProps {
 }
 
 export function NewsFeed({ funds = [] }: NewsFeedProps) {
+  const { token } = useAuth()
   const [news, setNews] = useState<NewsItem[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -206,6 +210,58 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [showImportantOnly, setShowImportantOnly] = useState(false)
   const [showHoldingsOnly, setShowHoldingsOnly] = useState(false)
+  
+  // Webhook state
+  const [webhookConfig, setWebhookConfig] = useState<WebhookConfig>(DEFAULT_WEBHOOK_CONFIG)
+  const [showWebhookPanel, setShowWebhookPanel] = useState(false)
+  const [webhookLoading, setWebhookLoading] = useState(false)
+  const [webhookSaving, setWebhookSaving] = useState(false)
+  const [webhookTesting, setWebhookTesting] = useState(false)
+  
+  useEffect(() => {
+    if (!token) return
+    setWebhookLoading(true)
+    fetchWebhookConfig(token)
+      .then(({ config }) => setWebhookConfig(config))
+      .catch((error) => console.error('加载 Webhook 配置失败:', error))
+      .finally(() => setWebhookLoading(false))
+  }, [token])
+
+  const handleSaveWebhookConfig = useCallback(async () => {
+    if (!token) return
+    setWebhookSaving(true)
+    try {
+      const { config } = await updateWebhookConfig(token, webhookConfig)
+      setWebhookConfig(config)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '保存失败')
+    } finally {
+      setWebhookSaving(false)
+    }
+  }, [token, webhookConfig])
+
+  const handleTestWebhook = useCallback(async () => {
+    if (!token) return
+    setWebhookTesting(true)
+    try {
+      const { success } = await testWebhook(token)
+      alert(success ? '测试消息已发送' : '测试失败，请检查配置')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '测试失败')
+    } finally {
+      setWebhookTesting(false)
+    }
+  }, [token])
+
+  const handleRefreshKeywords = useCallback(async () => {
+    if (!token) return
+    try {
+      await refreshPortfolioRequest(token)
+      alert('已触发后台刷新，稍后自动生效')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '刷新失败')
+    }
+  }, [token])
   
   // 资产透视分析结果
   const [portfolioAnalysis, setPortfolioAnalysis] = useState<PortfolioAnalysis | null>(null)
@@ -283,11 +339,13 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
           // 找出新条目
           const prevIds = new Set(prev.map(item => item.id || String(item.ctime)))
           const currentNewIds = new Set<string>()
+          const newItems: NewsItem[] = []
           
           data.forEach(item => {
             const id = item.id || String(item.ctime)
             if (!prevIds.has(id)) {
               currentNewIds.add(id)
+              newItems.push(item)
             }
           })
           
@@ -300,6 +358,7 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
             // 合并新数据，去重
             const existingIds = new Set(data.map(n => n.id || String(n.ctime)))
             const oldItems = prev.filter(n => !existingIds.has(n.id || String(n.ctime)))
+            
             return [...data, ...oldItems]
           }
           
@@ -342,56 +401,56 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
     return { isImportant, isHighlighted, sentiment }
   }, [portfolioAnalysis])
 
-  // Automatic AI Analysis for highlighted items
-  useEffect(() => {
-    if (!portfolioAnalysis || news.length === 0) return
+  // Automatic AI Analysis for highlighted items - 已禁用
+  // useEffect(() => {
+  //   if (!portfolioAnalysis || news.length === 0) return
 
-    const processQueue = async () => {
-      // Find items that are highlighted, not analyzed, and not currently analyzing
-      const candidates = news.filter(item => {
-        const id = item.id || String(item.ctime)
-        const { isHighlighted } = analyzeItem(item)
-        return isHighlighted && !aiAnalysisResults[id] && !analyzingIds.has(id)
-      })
+  //   const processQueue = async () => {
+  //     // Find items that are highlighted, not analyzed, and not currently analyzing
+  //     const candidates = news.filter(item => {
+  //       const id = item.id || String(item.ctime)
+  //       const { isHighlighted } = analyzeItem(item)
+  //       return isHighlighted && !aiAnalysisResults[id] && !analyzingIds.has(id)
+  //     })
 
-      // Take only the top 5 most recent to avoid flood
-      const batch = candidates.slice(0, 5)
+  //     // Take only the top 5 most recent to avoid flood
+  //     const batch = candidates.slice(0, 5)
       
-      if (batch.length === 0) return
+  //     if (batch.length === 0) return
 
-      // Mark as analyzing
-      setAnalyzingIds(prev => {
-        const next = new Set(prev)
-        batch.forEach(item => next.add(item.id || String(item.ctime)))
-        return next
-      })
+  //     // Mark as analyzing
+  //     setAnalyzingIds(prev => {
+  //       const next = new Set(prev)
+  //       batch.forEach(item => next.add(item.id || String(item.ctime)))
+  //       return next
+  //     })
 
-      // Process batch
-      await Promise.allSettled(batch.map(async (item) => {
-        const id = item.id || String(item.ctime)
-        try {
-          const stocks = Array.from(portfolioAnalysis.keywords)
-          const prompt = generateSingleNewsAnalysisPrompt(item, stocks)
-          const result = await callAIAnalysis(prompt)
+  //     // Process batch
+  //     await Promise.allSettled(batch.map(async (item) => {
+  //       const id = item.id || String(item.ctime)
+  //       try {
+  //         const stocks = Array.from(portfolioAnalysis.keywords)
+  //         const prompt = generateSingleNewsAnalysisPrompt(item, stocks)
+  //         const result = await callAIAnalysis(prompt)
           
-          setAiAnalysisResults(prev => ({
-            ...prev,
-            [id]: result
-          }))
-        } catch (error) {
-          console.error(`AI analysis failed for ${id}`, error)
-        } finally {
-          setAnalyzingIds(prev => {
-            const next = new Set(prev)
-            next.delete(id)
-            return next
-          })
-        }
-      }))
-    }
+  //         setAiAnalysisResults(prev => ({
+  //           ...prev,
+  //           [id]: result
+  //         }))
+  //       } catch (error) {
+  //         console.error(`AI analysis failed for ${id}`, error)
+  //       } finally {
+  //         setAnalyzingIds(prev => {
+  //           const next = new Set(prev)
+  //           next.delete(id)
+  //           return next
+  //         })
+  //       }
+  //     }))
+  //   }
 
-    processQueue()
-  }, [news, portfolioAnalysis, analyzeItem, aiAnalysisResults, analyzingIds])
+  //   processQueue()
+  // }, [news, portfolioAnalysis, analyzeItem, aiAnalysisResults, analyzingIds])
 
   useEffect(() => {
     loadNews()
@@ -484,7 +543,117 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
             </div>
             <span>只看重要</span>
           </div>
+
+          <div className="filter-toggle" onClick={() => setShowWebhookPanel(!showWebhookPanel)}>
+            <div className={`toggle-switch ${webhookConfig.enabled ? 'active' : ''}`}>
+              <div className="toggle-knob"></div>
+            </div>
+            <span>Webhook{webhookConfig.enabled ? '已启用' : '推送'}</span>
+          </div>
         </div>
+
+        {/* Webhook Configuration Panel */}
+        {showWebhookPanel && (
+          <div className="webhook-panel" style={{ marginTop: '16px', padding: '16px', background: 'var(--card-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Webhook 配置 {webhookLoading && '（加载中...）'}</h4>
+              <button 
+                onClick={() => setShowWebhookPanel(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                Webhook URL
+              </label>
+              <input
+                type="text"
+                value={webhookConfig.url}
+                onChange={(e) => setWebhookConfig((prev) => ({ ...prev, url: e.target.value }))}
+                placeholder="https://..."
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '13px' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                密钥（可选，用于签名验证）
+              </label>
+              <input
+                type="password"
+                value={webhookConfig.secret || ''}
+                onChange={(e) => setWebhookConfig((prev) => ({ ...prev, secret: e.target.value }))}
+                placeholder="可选"
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '13px' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={webhookConfig.holdingsOnly}
+                  onChange={(e) => setWebhookConfig((prev) => ({ ...prev, holdingsOnly: e.target.checked }))}
+                />
+                仅发送持仓相关
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={webhookConfig.enabled}
+                  onChange={(e) => setWebhookConfig((prev) => ({ ...prev, enabled: e.target.checked }))}
+                />
+                启用推送
+              </label>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                推送间隔（分钟）
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={webhookConfig.interval}
+                onChange={(e) => setWebhookConfig((prev) => ({ ...prev, interval: Math.max(1, parseInt(e.target.value) || 1) }))}
+                style={{ width: '120px', padding: '6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleSaveWebhookConfig}
+                disabled={webhookSaving || !token}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--primary-color)', color: '#fff' }}
+              >
+                {webhookSaving ? '保存中...' : '保存配置'}
+              </button>
+              <button
+                onClick={handleTestWebhook}
+                disabled={!webhookConfig.enabled || webhookTesting}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-primary)' }}
+              >
+                {webhookTesting ? '测试中...' : '发送测试'}
+              </button>
+              <button
+                onClick={handleRefreshKeywords}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px dashed var(--border-color)', background: 'transparent', color: 'var(--text-secondary)' }}
+              >
+                刷新持仓关键词
+              </button>
+            </div>
+
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span>状态: {webhookConfig.enabled ? '已启用' : '未启用'}，仅持仓：{webhookConfig.holdingsOnly ? '是' : '否'}</span>
+              <span>最后发送: {webhookConfig.lastSentTime ? new Date(webhookConfig.lastSentTime).toLocaleTimeString('zh-CN') : '暂无记录'}</span>
+              <span>累计推送: {webhookConfig.sentCount ?? 0} 条 | 跟踪关键词: {webhookConfig.keywordsTracked ?? 0}</span>
+            </div>
+          </div>
+        )}
         
         {/* Portfolio X-Ray Summary */}
         {showHoldingsOnly && portfolioAnalysis && (

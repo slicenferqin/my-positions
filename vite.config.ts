@@ -67,7 +67,23 @@ export default defineConfig({
       },
       // 代理本地 AI 服务
       '/api/ai': {
-        target: 'http://127.0.0.1:5000',
+        target: 'http://127.0.0.1:5001',
+        changeOrigin: true,
+      },
+      '/api/auth': {
+        target: 'http://127.0.0.1:5001',
+        changeOrigin: true,
+      },
+      '/api/funds': {
+        target: 'http://127.0.0.1:5001',
+        changeOrigin: true,
+      },
+      '/api/webhook': {
+        target: 'http://127.0.0.1:5001',
+        changeOrigin: true,
+      },
+      '/api/portfolio': {
+        target: 'http://127.0.0.1:5001',
         changeOrigin: true,
       }
     },

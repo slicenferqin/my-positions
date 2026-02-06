@@ -5,7 +5,7 @@ import './EditFundForm.css'
 
 interface EditFundFormProps {
   fund: FundWithEstimation
-  onSave: (code: string, updates: { shares: number; cost: number }) => void
+  onSave: (fundId: number, updates: { shares: number; cost: number }) => void
   onCancel: () => void
 }
 
@@ -48,7 +48,8 @@ export function EditFundForm({ fund, onSave, onCancel }: EditFundFormProps) {
       return
     }
 
-    onSave(fund.code, {
+    if (!fund.id) return
+    onSave(fund.id, {
       shares: sharesNum,
       cost: finalCost,
     })

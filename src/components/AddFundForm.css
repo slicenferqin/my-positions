@@ -1,109 +1,125 @@
 .add-fund-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(2, 5, 15, 0.78);
+  backdrop-filter: blur(18px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  padding: 20px;
+  z-index: 2000;
+  padding: 24px;
 }
 
 .add-fund-form {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
   width: 100%;
-  max-width: 400px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  max-width: 420px;
+  padding: 28px;
+  border-radius: 24px;
+  background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1), transparent 55%),
+    rgba(4, 7, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 35px 65px rgba(0, 0, 0, 0.6);
+  color: var(--text-primary);
+  position: relative;
+}
+
+.add-fund-form::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  pointer-events: none;
 }
 
 .add-fund-form h3 {
-  margin: 0 0 20px;
-  font-size: 18px;
-  color: var(--text-color);
+  font-family: 'Chakra Petch', sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 1.1rem;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--accent-electric);
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 0.85rem;
   color: var(--text-secondary);
+  margin-bottom: 6px;
+  letter-spacing: 0.05em;
 }
 
 .form-group input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
-  transition: border-color 0.2s;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-color: var(--accent-electric);
+  box-shadow: 0 0 0 2px rgba(70, 211, 255, 0.15);
 }
 
 .form-group input:disabled {
-  background: #f5f5f5;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .form-error {
-  padding: 10px 12px;
-  background: #fff2f0;
-  border: 1px solid #ffccc7;
-  border-radius: 8px;
-  color: var(--danger-color);
-  font-size: 14px;
-  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 109, 139, 0.15);
+  border: 1px solid rgba(255, 109, 139, 0.35);
+  color: var(--rise-color);
+  font-size: 0.9rem;
+  margin-bottom: 18px;
 }
 
 .form-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 14px;
+  margin-top: 24px;
 }
 
 .form-actions button {
   flex: 1;
-  padding: 12px;
+  padding: 12px 0;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .btn-cancel {
-  background: #f5f5f5;
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-secondary);
 }
 
-.btn-cancel:hover:not(:disabled) {
-  background: #e8e8e8;
-}
-
 .btn-submit {
-  background: var(--primary-color);
-  color: white;
+  background: linear-gradient(120deg, var(--accent-electric), var(--accent-color));
+  color: #05070f;
 }
 
-.btn-submit:hover:not(:disabled) {
-  background: #40a9ff;
+.form-actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
-.btn-cancel:disabled,
-.btn-submit:disabled {
+.form-actions button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

@@ -9,26 +9,26 @@ import './FundTable.css'
 interface FundTableProps {
   funds: FundWithEstimation[]
   intradayData: Map<string, IntradayPoint[]>
-  onRemove: (code: string) => void
-  onTransaction: (code: string, transaction: Omit<Transaction, 'id' | 'fundCode'>) => void
-  onDeleteTransaction?: (code: string, transactionId: string) => void
-  onEdit: (code: string, updates: { shares: number; cost: number }) => void
+  onRemove: (fundId: number) => Promise<void> | void
+  onTransaction: (fundId: number, transaction: Omit<Transaction, 'id' | 'fundCode'>) => Promise<void> | void
+  onDeleteTransaction?: (fundId: number, transactionId: string | number) => Promise<void> | void
+  onEdit: (fundId: number, updates: { shares: number; cost: number }) => Promise<void> | void
 }
 
 type SortKey = 'change' | 'value' | 'profit' | 'today' | null
 type SortDirection = 'asc' | 'desc'
 
 export function FundTable({ funds, intradayData, onRemove, onTransaction, onDeleteTransaction, onEdit }: FundTableProps) {
-  const [expandedFundCode, setExpandedFundCode] = useState<string | null>(null)
-  const [transactionFundCode, setTransactionFundCode] = useState<string | null>(null)
+  const [expandedFundId, setExpandedFundId] = useState<number | null>(null)
+  const [transactionFundId, setTransactionFundId] = useState<number | null>(null)
   const [editingFund, setEditingFund] = useState<FundWithEstimation | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   // 获取当前正在进行调仓的基金的最新状态
   const transactionFund = useMemo(() => {
-    return funds.find(f => f.code === transactionFundCode) || null
-  }, [funds, transactionFundCode])
+    return funds.find(f => f.id === transactionFundId) || null
+  }, [funds, transactionFundId])
 
   // 计算每个基金的排序数值
   const getFundValues = (fund: FundWithEstimation) => {
@@ -95,8 +95,8 @@ export function FundTable({ funds, intradayData, onRemove, onTransaction, onDele
     return sortDirection === 'desc' ? ' ↓' : ' ↑'
   }
 
-  const toggleExpand = (code: string) => {
-    setExpandedFundCode(prev => prev === code ? null : code)
+  const toggleExpand = (fundId: number) => {
+    setExpandedFundId(prev => prev === fundId ? null : fundId)
   }
 
   return (
@@ -128,13 +128,13 @@ export function FundTable({ funds, intradayData, onRemove, onTransaction, onDele
             const profit = currentValue - fund.cost
             const profitPercent = fund.cost > 0 ? (profit / fund.cost) * 100 : 0
             const todayProfit = currentValue - lastValue
-            const isExpanded = expandedFundCode === fund.code
+             const isExpanded = expandedFundId === fund.id
 
             return (
-              <React.Fragment key={fund.code}>
+              <React.Fragment key={fund.id ?? fund.code}>
                 <tr
                   className={`${fund.loading ? 'loading' : ''} ${isExpanded ? 'expanded' : ''}`}
-                  onClick={() => toggleExpand(fund.code)}
+                  onClick={() => fund.id && toggleExpand(fund.id)}
                   style={{ cursor: 'pointer' }}
                 >
                   <td className="col-name">
@@ -184,7 +184,7 @@ export function FundTable({ funds, intradayData, onRemove, onTransaction, onDele
                       className="btn-icon btn-trade"
                       onClick={(e) => {
                         e.stopPropagation()
-                        setTransactionFundCode(fund.code)
+                        setTransactionFundId(fund.id ?? null)
                       }}
                       title="调仓"
                     >
@@ -194,7 +194,9 @@ export function FundTable({ funds, intradayData, onRemove, onTransaction, onDele
                       className="btn-icon btn-remove"
                       onClick={(e) => {
                         e.stopPropagation()
-                        onRemove(fund.code)
+                        if (fund.id) {
+                          onRemove(fund.id)
+                        }
                       }}
                       title="删除"
                     >
@@ -205,10 +207,10 @@ export function FundTable({ funds, intradayData, onRemove, onTransaction, onDele
                 {isExpanded && (
                   <tr className="detail-row">
                     <td colSpan={6} style={{ padding: 0, border: 'none' }}>
-                      <FundDetailRow 
-                        fund={fund} 
-                        intradayData={intradayData.get(fund.code)}
-                      />
+                       <FundDetailRow 
+                         fund={fund} 
+                         intradayData={intradayData.get(fund.code)}
+                       />
                     </td>
                   </tr>
                 )}
@@ -221,24 +223,29 @@ export function FundTable({ funds, intradayData, onRemove, onTransaction, onDele
       {transactionFund && (
         <TransactionForm
           fund={transactionFund}
-          onSubmit={(transaction) => {
-            onTransaction(transactionFund.code, transaction)
-            setTransactionFundCode(null)
+          onSubmit={async (transaction) => {
+            if (!transactionFund?.id) return
+            await onTransaction(transactionFund.id, transaction)
+            setTransactionFundId(null)
           }}
-          onCancel={() => setTransactionFundCode(null)}
+          onCancel={() => setTransactionFundId(null)}
           onDeleteTransaction={
             onDeleteTransaction 
-              ? (id) => onDeleteTransaction(transactionFund.code, id)
-              : undefined
-          }
-        />
+                ? async (id) => {
+                    if (transactionFund?.id) {
+                      await onDeleteTransaction(transactionFund.id, id)
+                    }
+                  }
+                : undefined
+            }
+          />
       )}
 
       {editingFund && (
         <EditFundForm
           fund={editingFund}
-          onSave={(code, updates) => {
-            onEdit(code, updates)
+          onSave={async (id, updates) => {
+            await onEdit(id, updates)
             setEditingFund(null)
           }}
           onCancel={() => setEditingFund(null)}

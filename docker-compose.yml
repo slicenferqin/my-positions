@@ -1,0 +1,32 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    volumes:
+      - ~/.anthropic:/root/.anthropic
+      - ~/.config/claude-code:/root/.config/claude-code
+      - backend-data:/data
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - DATABASE_URL=sqlite:////data/mypositions.db
+      - JWT_SECRET=${JWT_SECRET:-change-this-jwt-secret}
+      - JWT_EXPIRES_DAYS=${JWT_EXPIRES_DAYS:-15}
+      - NEWS_POLL_SECONDS=${NEWS_POLL_SECONDS:-60}
+    restart: unless-stopped
+
+volumes:
+  backend-data:

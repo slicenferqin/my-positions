@@ -20,7 +20,7 @@ export type TransactionType = 'buy' | 'sell'
  * 调仓记录
  */
 export interface Transaction {
-  id: string
+  id: string | number
   fundCode: string
   type: TransactionType
   shares: number
@@ -34,6 +34,7 @@ export interface Transaction {
  * 用户持仓的基金信息
  */
 export interface UserFund {
+  id?: number
   code: string
   name: string
   shares: number

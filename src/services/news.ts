@@ -114,26 +114,3 @@ ${news.content}
 请直接给出分析结果，不要废话，字数控制在100字以内。
 `
 }
-
-export async function callAIAnalysis(prompt: string): Promise<string> {
-  try {
-    const response = await fetch('/api/ai/analyze', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ prompt })
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Request failed: ${response.status}`)
-    }
-
-    const data = await response.json()
-    return data.result
-  } catch (error) {
-    console.error('AI Analysis failed:', error)
-    throw error
-  }
-}

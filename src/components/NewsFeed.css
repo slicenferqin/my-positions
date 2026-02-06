@@ -584,3 +584,26 @@
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Webhook Panel */
+.webhook-panel {
+  animation: slideDown 0.2s ease-out;
+}
+
+.webhook-panel input[type="text"],
+.webhook-panel input[type="password"] {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.webhook-panel input[type="text"]:focus,
+.webhook-panel input[type="password"]:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.webhook-panel input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}

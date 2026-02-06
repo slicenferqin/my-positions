@@ -5,9 +5,9 @@ import './TransactionForm.css'
 
 interface TransactionFormProps {
   fund: FundWithEstimation
-  onSubmit: (transaction: Omit<Transaction, 'id' | 'fundCode'>) => void
+  onSubmit: (transaction: Omit<Transaction, 'id' | 'fundCode'>) => Promise<void> | void
   onCancel: () => void
-  onDeleteTransaction?: (id: string) => void
+  onDeleteTransaction?: (id: string | number) => Promise<void> | void
 }
 
 export function TransactionForm({ fund, onSubmit, onCancel, onDeleteTransaction }: TransactionFormProps) {
@@ -55,7 +55,7 @@ export function TransactionForm({ fund, onSubmit, onCancel, onDeleteTransaction 
     })
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: string | number) => {
     if (confirm('确定要删除这条调仓记录吗？') && onDeleteTransaction) {
       onDeleteTransaction(id)
     }

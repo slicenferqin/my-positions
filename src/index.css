@@ -1,36 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
 :root {
-  /* 专业金融配色 - 优化版 */
-  --primary-color: #1a2a3a;
-  --primary-light: #2c3e50;
-  --accent-color: #2980b9;
-  
-  /* 涨跌颜色 - 鲜艳版 */
-  --rise-color: #ff4d4f;
-  --rise-bg: rgba(255, 77, 79, 0.08);
-  --fall-color: #27ae60;
-  --fall-bg: rgba(39, 174, 96, 0.08);
-  --flat-color: #95a5a6;
+  --accent-color: #f6e06a;
+  --accent-electric: #46d3ff;
 
-  /* 文字颜色 */
-  --text-primary: #1f2937;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
+  --rise-color: #ff6d8b;
+  --rise-bg: rgba(255, 109, 139, 0.08);
+  --fall-color: #72f5c9;
+  --fall-bg: rgba(114, 245, 201, 0.08);
+  --flat-color: #9399c4;
 
-  /* 背景和边框 */
-  --bg-primary: #f3f4f6;
-  --bg-secondary: #e5e7eb;
-  --bg-card: #ffffff;
-  --bg-hover: #f9fafb;
-  --border-color: #e5e7eb;
-  --border-dark: #d1d5db;
+  --text-primary: #f8fbff;
+  --text-secondary: #97a4c0;
+  --text-muted: #5f6782;
 
-  /* 阴影 */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  
-  /* 渐变 */
-  --gradient-header: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  --bg-primary: #030712;
+  --bg-card: rgba(5, 7, 18, 0.88);
+  --bg-secondary: rgba(15, 20, 39, 0.9);
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --border-dark: rgba(255, 255, 255, 0.18);
+
+  --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 20px 40px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 30px 70px rgba(0, 0, 0, 0.55);
+
+  --gradient-header: linear-gradient(120deg, #161a2a, #0b1324);
 }
 
 * {
@@ -40,12 +35,13 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-family: 'IBM Plex Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
 
 /* 涨跌颜色类 */

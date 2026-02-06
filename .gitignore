@@ -11,6 +11,9 @@
 
 # Local Env
 /venv
+server/venv
+server/__pycache__/
+server/instance/
 .env
 
 # IDE & Editor
@@ -31,3 +34,4 @@ yarn-error.log*
 /.playwright-mcp
 /.spec-workflow
 temp_fund_data.js
+*.tsbuildinfo

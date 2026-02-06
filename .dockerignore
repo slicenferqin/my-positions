@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.idea
+.vscode
+venv
+server/venv
+server/__pycache__
+server/instance
+*.log
+*.tsbuildinfo
