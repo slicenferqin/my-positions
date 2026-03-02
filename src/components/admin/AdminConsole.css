@@ -1,0 +1,183 @@
+.admin-console {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-console-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-console-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.admin-console-header p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--semi-color-text-2);
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-card {
+  border: 1px solid var(--semi-color-border);
+}
+
+.admin-form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-field {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.admin-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-prompt-history {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-prompt-editor {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.admin-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.admin-job-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-job-item {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-job-meta {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.admin-job-side {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.admin-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-box {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.metric-box span {
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.metric-box strong {
+  font-size: 18px;
+}
+
+.admin-health-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.admin-audit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-audit-item {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-empty {
+  color: var(--semi-color-text-2);
+  font-size: 13px;
+}
+
+@media (max-width: 1200px) {
+  .admin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

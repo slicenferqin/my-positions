@@ -1,209 +1,189 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import { Card, Progress, Tag, Space } from '@douyinfe/semi-ui'
 import { analyzePortfolio, fetchFundPortfolio } from '@/services'
 import type { FundWithEstimation, Stock } from '@/types'
-import './PortfolioAnalysis.css'
 
-interface Props {
+interface PortfolioAnalysisProps {
   funds: FundWithEstimation[]
+  mode?: 'summary' | 'full'
+  embedded?: boolean
 }
 
-export function PortfolioAnalysis({ funds }: Props) {
+export function PortfolioAnalysis({ funds, mode = 'full', embedded = false }: PortfolioAnalysisProps) {
   const [realHoldings, setRealHoldings] = useState<Record<string, Stock[]>>({})
   const loadedCodesRef = useRef(new Set<string>())
 
-  // 获取真实持仓数据
   useEffect(() => {
     const loadHoldings = async () => {
       const codesToFetch = funds
-        .map(f => f.code)
-        .filter(code => !loadedCodesRef.current.has(code))
+        .map((fund) => fund.code)
+        .filter((code) => !loadedCodesRef.current.has(code))
 
       if (codesToFetch.length === 0) return
+      codesToFetch.forEach((code) => loadedCodesRef.current.add(code))
 
-      // 标记为已处理
-      codesToFetch.forEach(c => loadedCodesRef.current.add(c))
-
-      const newHoldings: Record<string, Stock[]> = {}
+      const next: Record<string, Stock[]> = {}
       await Promise.all(codesToFetch.map(async (code) => {
         try {
           const stocks = await fetchFundPortfolio(code)
-          if (stocks && stocks.length > 0) {
-            newHoldings[code] = stocks.map(s => ({
-              name: s.name,
-              code: s.code,
-              ratio: s.percent
+          if (stocks.length > 0) {
+            next[code] = stocks.map((item) => ({
+              name: item.name,
+              code: item.code,
+              ratio: item.percent,
             }))
           }
-        } catch (e) {
-          console.error(`Load portfolio failed for ${code}`, e)
+        } catch (error) {
+          console.error(`Load portfolio failed for ${code}`, error)
         }
       }))
 
-      if (Object.keys(newHoldings).length > 0) {
-        setRealHoldings(prev => ({ ...prev, ...newHoldings }))
+      if (Object.keys(next).length > 0) {
+        setRealHoldings((prev) => ({ ...prev, ...next }))
       }
     }
 
-    if (funds.length > 0) {
-      loadHoldings()
-    }
-  }, [funds.map(f => f.code).join(',')])
+    if (funds.length > 0) loadHoldings()
+  }, [funds.map((item) => item.code).join(',')])
 
   const analysis = useMemo(() => analyzePortfolio(funds, realHoldings), [funds, realHoldings])
   const { sectorAllocation, stockExposure, totalAssets, summary, dailyAttribution } = analysis
 
-  if (funds.length === 0 || totalAssets === 0) {
-    return (
-      <div className="portfolio-analysis-card empty">
-        <div className="analysis-icon">📊</div>
-        <div className="analysis-empty-text">添加基金后查看持仓透视</div>
-      </div>
-    )
-  }
-  
-  // Format money helper
-  const fmtMoney = (val: number) => {
-    return (val >= 0 ? '+' : '') + val.toFixed(2)
-  }
+  const fmtMoney = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}`
 
-  return (
-    <div className="portfolio-analysis-card">
-      <div className="analysis-header">
-        <div className="header-title-row">
-          <h3>持仓深度透视</h3>
-          <span className="badge-xray">X-RAY</span>
+  const emptyNode = (
+    <div style={{ textAlign: 'center', padding: '30px 16px', color: 'var(--semi-color-text-2)' }}>
+      <div style={{ fontSize: '30px', marginBottom: '8px' }}>🧭</div>
+      <div>添加持仓后查看持仓透视</div>
+    </div>
+  )
+
+  const summaryNode = (
+    <div>
+      <div style={{ fontSize: '13px', lineHeight: '1.6', color: 'var(--semi-color-text-1)' }}>
+        {summary}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', marginTop: '10px' }}>
+        <div style={{ background: 'var(--semi-color-fill-0)', borderRadius: '8px', padding: '8px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--semi-color-text-2)' }}>首位行业</div>
+          <div style={{ marginTop: '4px', fontSize: '16px', fontWeight: 600 }}>
+            {sectorAllocation[0]?.name || '-'}
+          </div>
         </div>
-        <p className="analysis-summary">{summary}</p>
+        <div style={{ background: 'var(--semi-color-fill-0)', borderRadius: '8px', padding: '8px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--semi-color-text-2)' }}>首位重仓</div>
+          <div style={{ marginTop: '4px', fontSize: '16px', fontWeight: 600 }}>
+            {stockExposure[0]?.name || '-'}
+          </div>
+        </div>
+      </div>
+      <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+        <Tag color="red" size="small">
+          领涨: {dailyAttribution.topGainers[0]?.name || '-'}
+        </Tag>
+        <Tag color="green" size="small">
+          拖累: {dailyAttribution.topLosers[0]?.name || '-'}
+        </Tag>
+      </div>
+    </div>
+  )
+
+  const fullNode = (
+    <div>
+      <div style={{
+        padding: '10px',
+        background: 'var(--semi-color-fill-0)',
+        borderRadius: '8px',
+        marginBottom: '16px',
+        fontSize: '13px',
+        color: 'var(--semi-color-text-1)',
+      }}>
+        {summary}
       </div>
 
-      {/* 今日异动归因 */}
-      <div className="analysis-section">
-        <h4 className="section-title">
-          <span>今日异动归因</span>
-          <span className="section-subtitle">盈亏来源分析</span>
-        </h4>
-        
-        <div className="attribution-grid">
-          {/* Top Gainers */}
-          {dailyAttribution.topGainers.length > 0 && (
-            <div className="attribution-col">
-              <div className="sub-title rise">
-                <span>🔥 领涨贡献</span>
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>今日异动归因</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+          <div>
+            <div style={{ fontSize: '12px', marginBottom: '6px', color: 'var(--semi-color-success)' }}>领涨贡献</div>
+            {dailyAttribution.topGainers.slice(0, 3).map((item) => (
+              <div key={item.code} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '3px 0' }}>
+                <span>{item.name}</span>
+                <span className="rise">{fmtMoney(item.amount)}</span>
               </div>
-              <div className="attribution-list">
-                {dailyAttribution.topGainers.map(item => (
-                  <div key={item.code} className="attribution-item">
-                    <div className="attr-name">{item.name}</div>
-                    <div className="attr-values">
-                      <span className="attr-amount rise">{fmtMoney(item.amount)}</span>
-                      <span className="attr-rate rise">+{item.returnRate?.toFixed(2)}%</span>
-                    </div>
-                  </div>
-                ))}
+            ))}
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', marginBottom: '6px', color: 'var(--semi-color-danger)' }}>领跌拖累</div>
+            {dailyAttribution.topLosers.slice(0, 3).map((item) => (
+              <div key={item.code} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '3px 0' }}>
+                <span>{item.name}</span>
+                <span className="fall">{fmtMoney(item.amount)}</span>
               </div>
-            </div>
-          )}
-          
-          {/* Top Losers */}
-          {dailyAttribution.topLosers.length > 0 && (
-            <div className="attribution-col">
-              <div className="sub-title fall">
-                <span>❄️ 领跌拖累</span>
-              </div>
-              <div className="attribution-list">
-                {dailyAttribution.topLosers.map(item => (
-                  <div key={item.code} className="attribution-item">
-                    <div className="attr-name">{item.name}</div>
-                    <div className="attr-values">
-                      <span className="attr-amount fall">{fmtMoney(item.amount)}</span>
-                      <span className="attr-rate fall">{item.returnRate?.toFixed(2)}%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Sector Contribution */}
-          <div className="attribution-col full-width">
-             <div className="sub-title">
-                <span>板块贡献分布</span>
-             </div>
-             <div className="sector-attribution-chart">
-               {dailyAttribution.sectorContribution.map(item => (
-                 <div key={item.name} className="sector-attr-row">
-                   <span className="sec-name">{item.name}</span>
-                   <div className="sec-bar-container">
-                     <div 
-                       className={`sec-bar ${item.amount >= 0 ? 'rise-bg' : 'fall-bg'}`}
-                       style={{ 
-                         width: `${Math.min(Math.abs(item.amount) / (Math.abs(dailyAttribution.totalDailyProfit) || 1) * 100 * 2, 100)}%`,
-                         marginLeft: item.amount >= 0 ? '50%' : 'auto',
-                         marginRight: item.amount < 0 ? '50%' : 'auto',
-                         transformOrigin: item.amount >= 0 ? 'left' : 'right'
-                       }}
-                     ></div>
-                   </div>
-                   <span className={`sec-val ${item.amount >= 0 ? 'rise' : 'fall'}`}>
-                     {fmtMoney(item.amount)}
-                   </span>
-                 </div>
-               ))}
-             </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* 行业分布 */}
-      <div className="analysis-section">
-        <h4 className="section-title">
-          <span>行业分布</span>
-          <span className="section-subtitle">Top 5</span>
-        </h4>
-        <div className="sector-chart">
-          {sectorAllocation.slice(0, 5).map((sector, index) => (
-            <div key={sector.name} className="chart-row">
-              <div className="row-label">{sector.name}</div>
-              <div className="row-bar-container">
-                <div 
-                  className="row-bar" 
-                  style={{ width: `${Math.min(sector.percent * 1.5, 100)}%`, animationDelay: `${index * 0.1}s` }}
-                ></div>
-              </div>
-              <div className="row-value">{sector.percent.toFixed(1)}%</div>
+      <div style={{ marginBottom: '14px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>行业分布 Top 5</div>
+        {sectorAllocation.slice(0, 5).map((item) => (
+          <div key={item.name} style={{ marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}>
+              <span>{item.name}</span>
+              <span>{item.percent.toFixed(1)}%</span>
             </div>
-          ))}
-        </div>
+            <Progress percent={Math.min(item.percent * 1.5, 100)} showInfo={false} stroke="var(--semi-color-primary)" />
+          </div>
+        ))}
       </div>
 
-      {/* 穿透重仓股 */}
-      <div className="analysis-section">
-        <h4 className="section-title">
-          <span>穿透重仓股</span>
-          <span className="section-subtitle">隐形持仓暴露</span>
-        </h4>
-        <div className="stock-list">
-          {stockExposure.slice(0, 8).map((stock, index) => (
-            <div key={stock.name} className="stock-item">
-              <div className="stock-info">
-                <span className="stock-name">{stock.name}</span>
-                <span className="stock-code">{stock.code}</span>
+      <div>
+        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>穿透重仓股 Top 8</div>
+        <Space vertical spacing={8} style={{ width: '100%' }}>
+          {stockExposure.slice(0, 8).map((item) => (
+            <div key={item.code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
+              <div>
+                <span>{item.name}</span>
+                <span style={{ marginLeft: '6px', color: 'var(--semi-color-text-2)' }}>{item.code}</span>
               </div>
-              <div className="stock-bar-bg">
-                <div 
-                  className="stock-bar-fill"
-                  style={{ width: `${Math.min(stock.percent * 2, 100)}%` }} 
-                ></div>
-              </div>
-              <div className="stock-percent">{stock.percent.toFixed(1)}%</div>
+              <span>{item.percent.toFixed(1)}%</span>
             </div>
           ))}
-        </div>
+        </Space>
       </div>
-      
-      <div className="analysis-footer">
-        数据来源：天天基金 | 基于最新季报重仓股估算
+
+      <div style={{
+        marginTop: '12px',
+        paddingTop: '10px',
+        borderTop: '1px dashed var(--semi-color-border)',
+        fontSize: '11px',
+        textAlign: 'right',
+        color: 'var(--semi-color-text-2)',
+      }}>
+        透视资产规模: ¥{totalAssets.toFixed(2)}
       </div>
     </div>
+  )
+
+  const content = funds.length === 0 || totalAssets === 0
+    ? emptyNode
+    : mode === 'summary'
+      ? summaryNode
+      : fullNode
+
+  if (embedded) return content
+
+  return (
+    <Card
+      title={(
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>持仓分析</span>
+          <Tag color="blue" size="small">X-RAY</Tag>
+        </div>
+      )}
+    >
+      {content}
+    </Card>
   )
 }

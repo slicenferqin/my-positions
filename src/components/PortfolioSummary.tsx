@@ -1,6 +1,6 @@
+import { Card } from '@douyinfe/semi-ui'
 import type { PortfolioSummary as PortfolioSummaryType } from '@/types'
 import { formatMoney } from '@/services'
-import './PortfolioSummary.css'
 
 interface PortfolioSummaryProps {
   summary: PortfolioSummaryType
@@ -20,43 +20,91 @@ export function PortfolioSummary({ summary }: PortfolioSummaryProps) {
   } = summary
 
   return (
-    <div className="portfolio-summary">
-      <div className="summary-item main">
-        <span className="label">总市值</span>
-        <span className="value">¥{formatMoney(totalValue, 2)}</span>
-      </div>
-      <div className="summary-item">
-        <span className="label">持仓成本</span>
-        <span className="value">¥{formatMoney(totalCost, 2)}</span>
-      </div>
-      <div className="summary-item">
-        <span className="label">持仓收益</span>
-        <span className={`value ${totalProfit >= 0 ? 'rise' : 'fall'}`}>
-          {totalProfit >= 0 ? '+' : ''}¥{formatMoney(totalProfit, 2)}
-          <small>({totalProfitPercent >= 0 ? '+' : ''}{formatMoney(totalProfitPercent, 2)}%)</small>
+    <Card
+      title="资产概览"
+      headerExtraContent={
+        <span style={{ fontSize: '13px', color: 'var(--semi-color-text-2)' }}>
+          {fundCount} 只基金
         </span>
-      </div>
-      <div className="summary-item">
-        <span className="label">今日收益</span>
-        <span className={`value ${todayProfit >= 0 ? 'rise' : 'fall'}`}>
-          {todayProfit >= 0 ? '+' : ''}¥{formatMoney(todayProfit, 2)}
-          <small>({todayProfitPercent >= 0 ? '+' : ''}{formatMoney(todayProfitPercent, 2)}%)</small>
-        </span>
-      </div>
-      {yesterdayProfit !== null && (
-        <div className="summary-item">
-          <span className="label">昨日收益</span>
-          <span className={`value ${yesterdayProfit >= 0 ? 'rise' : 'fall'}`}>
-            {yesterdayProfit >= 0 ? '+' : ''}¥{formatMoney(yesterdayProfit, 2)}
-            {yesterdayProfitPercent !== null && (
-              <small>({yesterdayProfitPercent >= 0 ? '+' : ''}{formatMoney(yesterdayProfitPercent, 2)}%)</small>
-            )}
-          </span>
+      }
+    >
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ fontSize: '13px', color: 'var(--semi-color-text-2)', marginBottom: '8px' }}>
+          总市值
         </div>
-      )}
-      <div className="summary-item meta">
-        <span className="fund-count">{fundCount} 只基金</span>
+        <div style={{ fontSize: '28px', fontWeight: 600 }}>
+          ¥{formatMoney(totalValue, 2)}
+        </div>
       </div>
-    </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
+        gap: '16px',
+        paddingTop: '16px',
+        borderTop: '1px solid var(--semi-color-border)'
+      }}>
+        <div>
+          <div style={{ fontSize: '13px', color: 'var(--semi-color-text-2)', marginBottom: '4px' }}>
+            持仓成本
+          </div>
+          <div style={{ fontSize: '16px', fontWeight: 500 }}>
+            ¥{formatMoney(totalCost, 2)}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: '13px', color: 'var(--semi-color-text-2)', marginBottom: '4px' }}>
+            累计盈亏
+          </div>
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 500,
+            color: totalProfit >= 0 ? 'var(--semi-color-success)' : 'var(--semi-color-danger)'
+          }}>
+            {totalProfit >= 0 ? '+' : ''}¥{formatMoney(totalProfit, 2)}
+            <span style={{ fontSize: '13px', marginLeft: '4px' }}>
+              ({totalProfitPercent >= 0 ? '+' : ''}{formatMoney(totalProfitPercent, 2)}%)
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: '13px', color: 'var(--semi-color-text-2)', marginBottom: '4px' }}>
+            今日盈亏
+          </div>
+          <div style={{
+            fontSize: '16px',
+            fontWeight: 500,
+            color: todayProfit >= 0 ? 'var(--semi-color-success)' : 'var(--semi-color-danger)'
+          }}>
+            {todayProfit >= 0 ? '+' : ''}¥{formatMoney(todayProfit, 2)}
+            <span style={{ fontSize: '13px', marginLeft: '4px' }}>
+              ({todayProfitPercent >= 0 ? '+' : ''}{formatMoney(todayProfitPercent, 2)}%)
+            </span>
+          </div>
+        </div>
+
+        {yesterdayProfit !== null && (
+          <div>
+            <div style={{ fontSize: '13px', color: 'var(--semi-color-text-2)', marginBottom: '4px' }}>
+              昨日收益
+            </div>
+            <div style={{
+              fontSize: '16px',
+              fontWeight: 500,
+              color: yesterdayProfit >= 0 ? 'var(--semi-color-success)' : 'var(--semi-color-danger)'
+            }}>
+              {yesterdayProfit >= 0 ? '+' : ''}¥{formatMoney(yesterdayProfit, 2)}
+              {yesterdayProfitPercent !== null && (
+                <span style={{ fontSize: '13px', marginLeft: '4px' }}>
+                  ({yesterdayProfitPercent >= 0 ? '+' : ''}{formatMoney(yesterdayProfitPercent, 2)}%)
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
   )
 }

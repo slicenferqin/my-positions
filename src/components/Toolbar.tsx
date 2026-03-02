@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
+import { Card, Button, Space, Toast, Tooltip } from '@douyinfe/semi-ui'
+import { IconPlus, IconRefresh, IconDownload, IconUpload } from '@douyinfe/semi-icons'
 import { useAuth } from '@/context/AuthContext'
 import { exportFundsRequest, importFundsRequest } from '@/services/api'
-import './Toolbar.css'
 
 interface ToolbarProps {
   onAddFund: () => void
@@ -12,19 +13,8 @@ interface ToolbarProps {
   onDataChange: () => Promise<void> | void
 }
 
-interface TooltipProps {
-  text: string
-  visible: boolean
-}
-
-function Tooltip({ text, visible }: TooltipProps) {
-  if (!visible) return null
-  return <span className="icon-tooltip">{text}</span>
-}
-
 export function Toolbar({ onAddFund, onRefresh, loading, fundCount, lastUpdate, onDataChange }: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [tooltip, setTooltip] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const { token } = useAuth()
 
@@ -40,8 +30,9 @@ export function Toolbar({ onAddFund, onRefresh, loading, fundCount, lastUpdate, 
       a.download = `我的持仓_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.json`
       a.click()
       URL.revokeObjectURL(url)
+      Toast.success('导出成功')
     } catch (error) {
-      alert(error instanceof Error ? error.message : '导出失败')
+      Toast.error(error instanceof Error ? error.message : '导出失败')
     } finally {
       setSyncing(false)
     }
@@ -61,9 +52,9 @@ export function Toolbar({ onAddFund, onRefresh, loading, fundCount, lastUpdate, 
         const payload = JSON.parse(event.target?.result as string)
         await importFundsRequest(token, payload)
         await onDataChange()
-        alert('导入成功')
+        Toast.success('导入成功')
       } catch (error) {
-        alert(error instanceof Error ? error.message : '导入失败')
+        Toast.error(error instanceof Error ? error.message : '导入失败')
       } finally {
         setSyncing(false)
       }
@@ -73,52 +64,77 @@ export function Toolbar({ onAddFund, onRefresh, loading, fundCount, lastUpdate, 
   }
 
   return (
-    <div className="toolbar">
-      <div className="toolbar-left">
-        <button className="icon-btn primary" onClick={onAddFund} onMouseEnter={() => setTooltip('add')} onMouseLeave={() => setTooltip(null)}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-          </svg>
-          <Tooltip text="添加基金" visible={tooltip === 'add'} />
-        </button>
-        <button
-          className="icon-btn"
-          onClick={onRefresh}
-          disabled={loading || fundCount === 0 || syncing}
-          onMouseEnter={() => setTooltip('refresh')}
-          onMouseLeave={() => setTooltip(null)}
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" className={loading ? 'spin' : ''}>
-            <path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
-          </svg>
-          <Tooltip text={loading ? '刷新中...' : '刷新估值'} visible={tooltip === 'refresh'} />
-        </button>
-      </div>
+    <Card
+      title="操作面板"
+      headerExtraContent={
+        lastUpdate && (
+          <span style={{ fontSize: '12px', color: 'var(--semi-color-text-2)' }}>
+            更新于 {lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )
+      }
+    >
+      <Space wrap>
+        <Tooltip content="添加持仓">
+          <Button
+            theme="solid"
+            icon={<IconPlus />}
+            onClick={onAddFund}
+          >
+            添加持仓
+          </Button>
+        </Tooltip>
 
-      <div className="toolbar-right">
-        {lastUpdate && (
-          <span className="update-time">更新于 {lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
-        )}
-        <button
-          className="icon-btn"
-          onClick={handleExport}
-          disabled={fundCount === 0 || syncing}
-          onMouseEnter={() => setTooltip('export')}
-          onMouseLeave={() => setTooltip(null)}
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-          </svg>
-          <Tooltip text="导出数据" visible={tooltip === 'export'} />
-        </button>
-        <button className="icon-btn" onClick={handleImportClick} onMouseEnter={() => setTooltip('import')} onMouseLeave={() => setTooltip(null)}>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" />
-          </svg>
-          <Tooltip text="导入数据" visible={tooltip === 'import'} />
-        </button>
-        <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+        <Tooltip content="刷新估值">
+          <Button
+            icon={<IconRefresh />}
+            onClick={onRefresh}
+            loading={loading}
+            disabled={fundCount === 0 || syncing}
+          >
+            刷新
+          </Button>
+        </Tooltip>
+
+        <Tooltip content="导出数据">
+          <Button
+            icon={<IconDownload />}
+            onClick={handleExport}
+            disabled={fundCount === 0 || syncing}
+            loading={syncing && !loading}
+          >
+            导出
+          </Button>
+        </Tooltip>
+
+        <Tooltip content="导入数据">
+          <Button
+            icon={<IconUpload />}
+            onClick={handleImportClick}
+            disabled={syncing}
+          >
+            导入
+          </Button>
+        </Tooltip>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleImport}
+          style={{ display: 'none' }}
+        />
+      </Space>
+
+      <div style={{
+        marginTop: '16px',
+        fontSize: '13px',
+        color: 'var(--semi-color-text-2)',
+        lineHeight: '1.6'
+      }}>
+        <div>💾 支持导入/导出 JSON 格式数据</div>
+        <div>🔄 自动同步云端，多设备访问</div>
       </div>
-    </div>
+    </Card>
   )
 }

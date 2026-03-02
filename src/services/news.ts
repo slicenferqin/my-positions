@@ -1,6 +1,7 @@
 import type { NewsResponse, NewsItem } from '@/types'
 
-const CLS_API_URL = '/nodeapi/telegraphList'
+const APP_BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
+const CLS_API_URL = `${APP_BASE}/nodeapi/telegraphList`
 
 interface FetchNewsParams {
   limit?: number

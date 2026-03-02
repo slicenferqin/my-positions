@@ -1,104 +1,161 @@
 import { useState } from 'react'
+import { Card, Form, Input, Button, Tabs, Toast } from '@douyinfe/semi-ui'
+import {
+  IconMail,
+  IconLock,
+  IconUser,
+  IconLineChartStroked,
+  IconCloudStroked,
+  IconBellStroked,
+  IconAIStrokedLevel1,
+  IconHelm,
+} from '@douyinfe/semi-icons'
 import { useAuth } from '@/context/AuthContext'
-import './AuthScreen.css'
 
 type Mode = 'login' | 'register'
 
 export function AuthScreen() {
   const { login, register, loading } = useAuth()
   const [mode, setMode] = useState<Mode>('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!email || !password) {
-      setError('请输入完整的账号和密码')
-      return
-    }
+  const handleSubmit = async (values: any) => {
     setSubmitting(true)
-    setError('')
     try {
       if (mode === 'login') {
-        await login({ email, password })
+        await login({ email: values.email, password: values.password })
       } else {
-        await register({ email, password, name })
+        await register({
+          email: values.email,
+          password: values.password,
+          name: values.name || '投资者'
+        })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败，请稍后重试')
+      Toast.error(err instanceof Error ? err.message : '操作失败，请稍后重试')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="auth-screen">
-      <div className="auth-panel">
-        <div className="auth-header">
-          <h1>My Positions</h1>
-          <p>智能基金看板 · 实时估值 · Webhook 推送</p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '24px'
+    }}>
+      <Card
+        style={{
+          width: '100%',
+          maxWidth: '440px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+        }}
+        bodyStyle={{ padding: '32px' }}
+      >
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{ color: 'var(--semi-color-primary)', marginBottom: '8px', lineHeight: 1 }}>
+            <IconLineChartStroked size="extra-large" />
+          </div>
+          <h1 style={{ fontSize: '24px', fontWeight: 600, margin: '0 0 8px 0' }}>
+            MyPositions
+          </h1>
+          <p style={{ fontSize: '14px', color: 'var(--semi-color-text-2)', margin: 0 }}>
+            智能投资组合追踪 · AI 情报分析
+          </p>
         </div>
 
-        <div className="auth-toggle">
-          <button
-            className={mode === 'login' ? 'active' : ''}
-            onClick={() => setMode('login')}
-            disabled={submitting}
-          >
-            登录
-          </button>
-          <button
-            className={mode === 'register' ? 'active' : ''}
-            onClick={() => setMode('register')}
-            disabled={submitting}
-          >
-            注册
-          </button>
-        </div>
+        {/* Tabs */}
+        <Tabs
+          type="button"
+          activeKey={mode}
+          onChange={(key) => setMode(key as Mode)}
+          style={{ marginBottom: '24px' }}
+        >
+          <Tabs.TabPane tab="登录" itemKey="login" />
+          <Tabs.TabPane tab="注册" itemKey="register" />
+        </Tabs>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        {/* Form */}
+        <Form
+          onSubmit={handleSubmit}
+          labelPosition="left"
+          labelAlign="left"
+        >
           {mode === 'register' && (
-            <div className="form-group">
-              <label>昵称</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="用于展示" />
-            </div>
+            <Form.Input
+              field="name"
+              label="昵称"
+              placeholder="用于展示"
+              prefix={<IconUser />}
+              rules={[{ required: false }]}
+            />
           )}
-          <div className="form-group">
-            <label>邮箱</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="username"
-            />
-          </div>
-          <div className="form-group">
-            <label>密码</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="至少 6 位"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            />
-          </div>
-          {error && <div className="auth-error">{error}</div>}
-          <button type="submit" className="auth-submit" disabled={submitting || loading}>
-            {submitting ? '处理中...' : mode === 'login' ? '立即登录' : '创建账户'}
-          </button>
-        </form>
 
-        <ul className="auth-features">
-          <li>📊 云端保存持仓 & 历史流水</li>
-          <li>🔔 后台实时拉取财经快讯并推送 Webhook</li>
-          <li>🧠 本地 Claude AI 快速解读事件影响</li>
-          <li>⚙️ Docker 一键部署，随时掌控账户</li>
-        </ul>
-      </div>
+          <Form.Input
+            field="email"
+            label="邮箱"
+            placeholder="you@example.com"
+            prefix={<IconMail />}
+            rules={[
+              { required: true, message: '请输入邮箱' },
+              { type: 'email', message: '请输入有效的邮箱地址' }
+            ]}
+          />
+
+          <Form.Input
+            field="password"
+            label="密码"
+            type="password"
+            placeholder="至少 6 位"
+            prefix={<IconLock />}
+            rules={[
+              { required: true, message: '请输入密码' },
+              { min: 6, message: '密码至少 6 位' }
+            ]}
+          />
+
+          <Button
+            htmlType="submit"
+            theme="solid"
+            block
+            size="large"
+            loading={submitting || loading}
+            style={{ marginTop: '24px' }}
+          >
+            {mode === 'login' ? '立即登录' : '创建账户'}
+          </Button>
+        </Form>
+
+        {/* Features */}
+        <div style={{
+          marginTop: '32px',
+          paddingTop: '24px',
+          borderTop: '1px solid var(--semi-color-border)'
+        }}>
+          <div style={{ fontSize: '13px', color: 'var(--semi-color-text-2)', lineHeight: '1.8' }}>
+            <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IconCloudStroked />
+              云端保存持仓 & 历史流水
+            </div>
+            <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IconBellStroked />
+              实时财经快讯 Webhook 推送
+            </div>
+            <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IconAIStrokedLevel1 />
+              AI 智能分析新闻影响
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <IconHelm />
+              Docker 一键部署，数据自主可控
+            </div>
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }

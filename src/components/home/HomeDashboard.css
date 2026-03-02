@@ -1,0 +1,366 @@
+.home-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi-card {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  padding: 14px;
+  min-height: 112px;
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.kpi-value.currency {
+  font-size: 32px;
+}
+
+.kpi-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kpi-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpi-risk-badge.low {
+  color: #237804;
+  background: rgba(82, 196, 26, 0.14);
+}
+
+.kpi-risk-badge.medium {
+  color: #ad6800;
+  background: rgba(250, 173, 20, 0.16);
+}
+
+.kpi-risk-badge.high {
+  color: #cf1322;
+  background: rgba(245, 34, 45, 0.14);
+}
+
+.home-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 8fr) minmax(290px, 4fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.home-primary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-secondary {
+  position: sticky;
+  top: 78px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.secondary-slot {
+  min-width: 0;
+}
+
+.fund-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fund-filter-chips {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fund-filter-chip {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--semi-color-text-1);
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fund-filter-chip.active {
+  border-color: var(--semi-color-primary);
+  color: var(--semi-color-primary);
+  background: var(--semi-color-primary-light-default);
+}
+
+.fund-table-shell {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--semi-color-border);
+  background: #fff;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.insight-card {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 12px;
+}
+
+.insight-card .semi-card-header-right {
+  margin-left: auto;
+}
+
+.insight-summary-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--semi-color-text-1);
+}
+
+.insight-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.insight-metric {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--semi-color-fill-0);
+}
+
+.insight-metric-label {
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.insight-metric-value {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.action-center-card {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 12px;
+}
+
+.action-center-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-center-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.action-center-tips {
+  margin-top: 10px;
+  border-top: 1px dashed var(--semi-color-border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.market-pulse-compact {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 12px;
+}
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alert-item {
+  border-radius: 10px;
+  border: 1px solid var(--semi-color-border);
+  padding: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+  background: #fff;
+}
+
+.alert-item:hover {
+  transform: translateY(-1px);
+}
+
+.alert-item.low {
+  border-left: 4px solid #52c41a;
+}
+
+.alert-item.medium {
+  border-left: 4px solid #faad14;
+}
+
+.alert-item.high {
+  border-left: 4px solid #f5222d;
+}
+
+.alert-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--semi-color-text-0);
+}
+
+.alert-message {
+  font-size: 12px;
+  margin-top: 4px;
+  color: var(--semi-color-text-1);
+  line-height: 1.5;
+}
+
+.alert-empty {
+  padding: 10px;
+  text-align: center;
+  color: var(--semi-color-text-2);
+  font-size: 12px;
+}
+
+.home-empty-card {
+  border: 1px dashed var(--semi-color-border);
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  border-radius: 12px;
+}
+
+.home-empty-content {
+  text-align: center;
+  padding: 56px 20px;
+}
+
+.home-empty-icon {
+  color: var(--semi-color-primary);
+  line-height: 1;
+}
+
+.home-empty-content h3 {
+  margin: 8px 0 4px;
+  font-size: 18px;
+}
+
+.home-empty-content p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--semi-color-text-2);
+}
+
+@media (max-width: 1199px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-secondary {
+    position: static;
+    order: -1;
+  }
+
+  .secondary-slot-alerts {
+    order: 1;
+  }
+
+  .secondary-slot-actions {
+    order: 2;
+  }
+
+  .secondary-slot-market {
+    order: 3;
+  }
+
+  .insight-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .kpi-card {
+    min-height: 74px;
+    padding: 10px 10px 8px;
+    border-radius: 10px;
+  }
+
+  .kpi-label {
+    margin-bottom: 4px;
+    font-size: 11px;
+  }
+
+  .kpi-value,
+  .kpi-value.currency {
+    font-size: 21px;
+    line-height: 1.05;
+  }
+
+  .kpi-meta {
+    margin-top: 5px;
+    font-size: 11px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .kpi-risk-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .action-center-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

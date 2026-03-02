@@ -1,5 +1,7 @@
 import type { FundEstimation, ParsedEstimation, TrendType, IntradayPoint, IntradayResponse } from '@/types'
 
+const APP_BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
+
 /**
  * 获取基金实时估值
  * @param fundCode 基金代码
@@ -8,7 +10,7 @@ import type { FundEstimation, ParsedEstimation, TrendType, IntradayPoint, Intrad
 export async function fetchFundEstimation(fundCode: string): Promise<FundEstimation> {
   const timestamp = Date.now()
   // 通过 Vite 代理访问天天基金 API
-  const url = `/api/fund/${fundCode}.js?rt=${timestamp}`
+  const url = `${APP_BASE}/api/fund/${fundCode}.js?rt=${timestamp}`
 
   const response = await fetch(url)
   if (!response.ok) {
@@ -85,6 +87,141 @@ export async function fetchMultipleFundEstimations(
   })
 
   await Promise.all(promises)
+  return results
+}
+
+function parseStockCodeInfo(rawCode: string): { secid: string; normalizedCode: string } | null {
+  const cleaned = rawCode.replace(/[^A-Za-z0-9.]/g, '').toUpperCase()
+  if (!cleaned) return null
+
+  let market: 'SH' | 'SZ' | 'BJ' | '' = ''
+  let digits = ''
+
+  const direct = cleaned.match(/^(SH|SZ|BJ)(\d{6})$/)
+  if (direct) {
+    market = direct[1] as 'SH' | 'SZ' | 'BJ'
+    digits = direct[2]
+  } else {
+    const prefixed = cleaned.match(/^(SH|SZ|BJ)\.?(\d{6})$/)
+    if (prefixed) {
+      market = prefixed[1] as 'SH' | 'SZ' | 'BJ'
+      digits = prefixed[2]
+    } else {
+      const reversed = cleaned.match(/^(\d{6})\.(SH|SZ|BJ)$/)
+      if (reversed) {
+        digits = reversed[1]
+        market = reversed[2] as 'SH' | 'SZ' | 'BJ'
+      } else if (/^\d{6}$/.test(cleaned)) {
+        digits = cleaned
+        if (/^[569]/.test(digits)) market = 'SH'
+        else if (/^[0123]/.test(digits)) market = 'SZ'
+        else if (/^[48]/.test(digits)) market = 'BJ'
+        else return null
+      } else {
+        return null
+      }
+    }
+  }
+
+  const marketId = market === 'SH' ? 1 : 0
+  return {
+    secid: `${marketId}.${digits}`,
+    normalizedCode: `${market}${digits}`,
+  }
+}
+
+export async function fetchMultipleStockEstimations(
+  stockCodes: string[]
+): Promise<Map<string, FundEstimation | Error>> {
+  const results = new Map<string, FundEstimation | Error>()
+  const uniqueCodes = [...new Set(stockCodes.map((code) => code.trim().toUpperCase()).filter(Boolean))]
+  if (uniqueCodes.length === 0) {
+    return results
+  }
+
+  const secidToCode = new Map<string, string>()
+  const secids: string[] = []
+  uniqueCodes.forEach((code) => {
+    const parsed = parseStockCodeInfo(code)
+    if (!parsed) {
+      results.set(code, new Error(`股票代码格式错误: ${code}`))
+      return
+    }
+    secids.push(parsed.secid)
+    secidToCode.set(parsed.secid, parsed.normalizedCode)
+    if (code !== parsed.normalizedCode) {
+      secidToCode.set(`${parsed.secid.split('.')[0]}.${code.slice(-6)}`, parsed.normalizedCode)
+    }
+  })
+
+  if (secids.length === 0) {
+    return results
+  }
+
+  try {
+    const timestamp = Date.now()
+    const url =
+      `https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=${secids.join(',')}` +
+      `&fields=f2,f3,f12,f13,f14&_=${timestamp}`
+    const response = await fetch(url, { method: 'GET' })
+    if (!response.ok) {
+      throw new Error(`获取股票行情失败: ${response.status}`)
+    }
+    const payload = await response.json()
+    const diff = payload?.data?.diff
+    if (!Array.isArray(diff)) {
+      throw new Error('股票行情返回格式异常')
+    }
+
+    const now = new Date()
+    const jzrq = now.toISOString().split('T')[0]
+    const gztime = now.toISOString().slice(0, 19).replace('T', ' ')
+
+    diff.forEach((item: { f2?: number; f3?: number; f12?: string; f13?: number; f14?: string }) => {
+      const digits = String(item.f12 || '').trim()
+      const marketId = Number(item.f13 || 0)
+      const secid = `${marketId}.${digits}`
+      const code = secidToCode.get(secid)
+      if (!code) return
+
+      const price = Number(item.f2 || 0)
+      const changePercent = Number(item.f3 || 0)
+      if (!Number.isFinite(price) || price <= 0) {
+        results.set(code, new Error(`股票行情无效: ${code}`))
+        return
+      }
+
+      const prevClose = Math.abs(100 + changePercent) < 1e-6
+        ? price
+        : price / (1 + changePercent / 100)
+
+      results.set(code, {
+        fundcode: code,
+        name: String(item.f14 || code),
+        jzrq,
+        dwjz: Number.isFinite(prevClose) ? prevClose.toFixed(4) : price.toFixed(4),
+        gsz: price.toFixed(4),
+        gszzl: changePercent.toFixed(2),
+        gztime,
+      })
+    })
+
+    uniqueCodes.forEach((code) => {
+      if (!results.has(code)) {
+        const normalized = parseStockCodeInfo(code)?.normalizedCode || code
+        if (!results.has(normalized)) {
+          results.set(normalized, new Error(`未返回股票行情: ${normalized}`))
+        }
+      }
+    })
+  } catch (error) {
+    uniqueCodes.forEach((code) => {
+      if (!results.has(code)) {
+        results.set(code, error instanceof Error ? error : new Error(String(error)))
+      }
+    })
+  }
+
   return results
 }
 

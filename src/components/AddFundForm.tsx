@@ -1,126 +1,140 @@
 import { useState } from 'react'
-import './AddFundForm.css'
+import { Modal, Form, Toast, RadioGroup, Radio } from '@douyinfe/semi-ui'
 
 interface AddFundFormProps {
-  onAdd: (fund: { code: string; name?: string; shares: number; cost: number }) => Promise<void>
+  onAdd: (fund: { code: string; name?: string; shares: number; cost: number; instrumentType?: 'fund' | 'stock' }) => Promise<void>
   onCancel: () => void
 }
 
 export function AddFundForm({ onAdd, onCancel }: AddFundFormProps) {
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
-  const [shares, setShares] = useState('')
-  const [cost, setCost] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [instrumentType, setInstrumentType] = useState<'fund' | 'stock'>('fund')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
-    // 验证
-    if (!code.trim()) {
-      setError('请输入基金代码')
+  const handleSubmit = async (values: any) => {
+    const code = values.code?.trim() || ''
+    if (instrumentType === 'fund') {
+      if (!/^\d{6}$/.test(code)) {
+        Toast.error('基金代码格式错误，应为6位数字')
+        return
+      }
+    } else if (!/^(\d{6}|(SH|SZ|BJ)\d{6}|(SH|SZ|BJ)\.\d{6}|\d{6}\.(SH|SZ|BJ))$/i.test(code)) {
+      Toast.error('股票代码格式错误，示例: 600519 或 SH600519')
       return
     }
 
-    if (!/^\d{6}$/.test(code.trim())) {
-      setError('基金代码格式错误，应为6位数字')
-      return
-    }
-
-    const sharesNum = parseFloat(shares) || 0
-    const costNum = parseFloat(cost) || 0
+    const sharesNum = parseFloat(values.shares) || 0
+    const costNum = parseFloat(values.cost) || 0
 
     if (sharesNum < 0 || costNum < 0) {
-      setError('份额和成本不能为负数')
+      Toast.error('份额和成本不能为负数')
       return
     }
 
     setLoading(true)
     try {
       await onAdd({
-        code: code.trim(),
-        name: name.trim() || undefined,
+        code,
+        name: values.name?.trim() || undefined,
         shares: sharesNum,
         cost: costNum,
+        instrumentType,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '添加失败')
+      Toast.error(err instanceof Error ? err.message : '添加失败')
       setLoading(false)
     }
   }
 
   return (
-    <div className="add-fund-overlay" onClick={onCancel}>
-      <div className="add-fund-form" onClick={(e) => e.stopPropagation()}>
-        <h3>添加基金</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="code">基金代码 *</label>
-            <input
-              id="code"
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="如: 007345"
-              maxLength={6}
-              disabled={loading}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="name">基金名称 (可选)</label>
-            <input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="留空则自动获取"
-              disabled={loading}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="shares">持有份额 (可选)</label>
-            <input
-              id="shares"
-              type="number"
-              value={shares}
-              onChange={(e) => setShares(e.target.value)}
-              placeholder="如: 1000.5678"
-              min="0"
-              step="any"
-              disabled={loading}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="cost">持仓成本 (可选)</label>
-            <input
-              id="cost"
-              type="number"
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-              placeholder="总投入金额"
-              min="0"
-              step="any"
-              disabled={loading}
-            />
-          </div>
-
-          {error && <div className="form-error">{error}</div>}
-
-          <div className="form-actions">
-            <button type="button" className="btn-cancel" onClick={onCancel} disabled={loading}>
-              取消
-            </button>
-            <button type="submit" className="btn-submit" disabled={loading}>
-              {loading ? '添加中...' : '添加'}
-            </button>
-          </div>
-        </form>
+    <Modal
+      title="添加持仓"
+      visible={true}
+      onCancel={onCancel}
+      getPopupContainer={() => document.body}
+      zIndex={2200}
+      footer={null}
+      width={480}
+    >
+      <div style={{ marginBottom: '16px' }}>
+        <RadioGroup
+          type="button"
+          value={instrumentType}
+          onChange={(event) => setInstrumentType(event.target.value as 'fund' | 'stock')}
+        >
+          <Radio value="fund">基金持仓</Radio>
+          <Radio value="stock">股票持仓</Radio>
+        </RadioGroup>
       </div>
-    </div>
+
+      <Form
+        onSubmit={handleSubmit}
+        labelPosition="left"
+        labelAlign="right"
+        labelWidth="100px"
+      >
+        <Form.Input
+          field="code"
+          label={instrumentType === 'fund' ? '基金代码' : '股票代码'}
+          placeholder={instrumentType === 'fund' ? '如: 007345' : '如: 600519 / SH600519'}
+          rules={[
+            { required: true, message: `请输入${instrumentType === 'fund' ? '基金' : '股票'}代码` },
+          ]}
+          maxLength={12}
+        />
+
+        <Form.Input
+          field="name"
+          label={instrumentType === 'fund' ? '基金名称' : '股票名称'}
+          placeholder="留空则自动获取"
+        />
+
+        <Form.InputNumber
+          field="shares"
+          label="持有份额"
+          placeholder="如: 1000.5678"
+          min={0}
+          precision={4}
+        />
+
+        <Form.InputNumber
+          field="cost"
+          label="持仓成本"
+          placeholder="总投入金额"
+          min={0}
+          precision={2}
+        />
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            style={{
+              padding: '8px 16px',
+              border: '1px solid var(--semi-color-border)',
+              background: 'transparent',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            取消
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: '8px 16px',
+              border: 'none',
+              background: 'var(--semi-color-primary)',
+              color: 'white',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            {loading ? '添加中...' : '添加'}
+          </button>
+        </div>
+      </Form>
+    </Modal>
   )
 }

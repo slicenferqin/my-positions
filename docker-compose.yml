@@ -1,4 +1,17 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-mypositions}
+      - POSTGRES_USER=${POSTGRES_USER:-mypositions}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mypositions}
+      - TZ=${APP_TIMEZONE:-Asia/Shanghai}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   frontend:
     build:
       context: .
@@ -15,18 +28,25 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5001:5001"
-    volumes:
-      - ~/.anthropic:/root/.anthropic
-      - ~/.config/claude-code:/root/.config/claude-code
-      - backend-data:/data
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=production
-      - DATABASE_URL=sqlite:////data/mypositions.db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://mypositions:mypositions@postgres:5432/mypositions}
       - JWT_SECRET=${JWT_SECRET:-change-this-jwt-secret}
       - JWT_EXPIRES_DAYS=${JWT_EXPIRES_DAYS:-15}
       - NEWS_POLL_SECONDS=${NEWS_POLL_SECONDS:-60}
+      - APP_TIMEZONE=${APP_TIMEZONE:-Asia/Shanghai}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
+      - AI_BASE_URL=${AI_BASE_URL:-}
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_MODEL_FAST=${AI_MODEL_FAST:-gpt-4o-mini}
+      - AI_MODEL_DEEP=${AI_MODEL_DEEP:-gpt-4o}
+      - AI_ENABLED=${AI_ENABLED:-false}
+      - DISABLE_BOOTSTRAP=${DISABLE_BOOTSTRAP:-false}
+      - DISABLE_BACKGROUND_WORKERS=${DISABLE_BACKGROUND_WORKERS:-false}
+    depends_on:
+      - postgres
     restart: unless-stopped
 
 volumes:
-  backend-data:
+  postgres-data:

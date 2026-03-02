@@ -1,0 +1,117 @@
+/* Semi Design 主题定制 */
+:root {
+  /* 主色调 */
+  --semi-color-primary: #1677ff;
+  --semi-color-primary-hover: #3c8dff;
+  --semi-color-primary-active: #0e5fd8;
+  --semi-color-primary-light-default: rgba(22, 119, 255, 0.1);
+  --semi-color-primary-light-hover: rgba(22, 119, 255, 0.2);
+  --semi-color-primary-light-active: rgba(22, 119, 255, 0.3);
+
+  /* 成功色（红涨） */
+  --semi-color-success: #f5222d;
+  --semi-color-success-hover: #ff4d4f;
+  --semi-color-success-active: #cf1322;
+  --semi-color-success-light-default: rgba(245, 34, 45, 0.1);
+  --semi-color-success-light-hover: rgba(245, 34, 45, 0.2);
+
+  /* 危险色（绿跌） */
+  --semi-color-danger: #52c41a;
+  --semi-color-danger-hover: #73d13d;
+  --semi-color-danger-active: #389e0d;
+  --semi-color-danger-light-default: rgba(82, 196, 26, 0.1);
+  --semi-color-danger-light-hover: rgba(82, 196, 26, 0.2);
+
+  /* 警告色 */
+  --semi-color-warning: #faad14;
+  --semi-color-warning-hover: #ffc53d;
+  --semi-color-warning-active: #d48806;
+
+  /* 圆角 */
+  --semi-border-radius-small: 4px;
+  --semi-border-radius-medium: 8px;
+  --semi-border-radius-large: 12px;
+
+  /* 背景色 */
+  --semi-color-bg-0: #ffffff;
+  --semi-color-bg-1: #f5f7fa;
+  --semi-color-bg-2: #ebeef5;
+  --semi-color-bg-3: #e5e6eb;
+  --semi-color-fill-0: #f7f8fa;
+  --semi-color-fill-1: #eff1f5;
+  --semi-color-fill-2: #e7ebf0;
+
+  /* 文字颜色 */
+  --semi-color-text-0: #1f2329;
+  --semi-color-text-1: #646a73;
+  --semi-color-text-2: #8f959e;
+  --semi-color-text-3: #c9cdd4;
+
+  /* 边框颜色 */
+  --semi-color-border: #e5e6eb;
+
+  /* 风险色阶 */
+  --risk-low: #52c41a;
+  --risk-medium: #faad14;
+  --risk-high: #f5222d;
+
+  /* 密度 */
+  --layout-gap-sm: 8px;
+  --layout-gap-md: 12px;
+  --layout-gap-lg: 16px;
+  --layout-gap-xl: 20px;
+}
+
+/* 数字等宽字体 */
+.monospace,
+.number {
+  font-family: 'SF Mono', 'Roboto Mono', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 涨跌颜色工具类 */
+.rise {
+  color: var(--semi-color-success);
+}
+
+.fall {
+  color: var(--semi-color-danger);
+}
+
+.rise-bg {
+  background-color: var(--semi-color-success-light-default);
+}
+
+.fall-bg {
+  background-color: var(--semi-color-danger-light-default);
+}
+
+/* 卡片阴影 */
+.card-shadow {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03),
+              0 1px 6px -1px rgba(0, 0, 0, 0.02),
+              0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.card-shadow-hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--semi-color-bg-1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--semi-color-bg-3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--semi-color-text-3);
+}

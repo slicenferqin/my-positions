@@ -6,8 +6,23 @@
   border: 1px solid var(--border-color);
 }
 
+.fund-table-desktop {
+  display: block;
+}
+
+.fund-mobile-list {
+  display: none;
+}
+
+.fund-table-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
 .fund-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
@@ -68,6 +83,10 @@
 
 .fund-table tbody tr.expanded td {
   border-bottom: none;
+}
+
+.fund-table tbody tr.fund-row-highlight {
+  animation: highlight-row 1.2s ease;
 }
 
 .fund-table tbody tr.detail-row:hover {
@@ -171,10 +190,15 @@
   opacity: 0.6;
 }
 
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .btn-icon:hover {
   opacity: 1;
   background-color: rgba(0, 0, 0, 0.05);
-  transform: scale(1.1);
+  transform: translateY(-1px);
 }
 
 .btn-edit:hover { color: var(--accent-color); }
@@ -193,19 +217,145 @@
   margin-top: 2px;
   opacity: 0.8;
 }
+
+@keyframes highlight-row {
+  0% {
+    background-color: rgba(22, 119, 255, 0.12);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
 /* 响应式 */
 @media (max-width: 900px) {
-  .fund-table {
-    font-size: 12px;
+  .fund-table-container {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
   }
 
-  .fund-table th,
-  .fund-table td {
-    padding: 10px 8px;
-  }
-
-  .col-value,
-  .col-profit small {
+  .fund-table-desktop {
     display: none;
+  }
+
+  .fund-mobile-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .fund-mobile-card {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-card);
+    padding: 12px;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+  }
+
+  .fund-mobile-card.loading {
+    opacity: 0.65;
+  }
+
+  .fund-mobile-card.fund-row-highlight {
+    animation: highlight-row 1.2s ease;
+  }
+
+  .fund-mobile-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .fund-mobile-price {
+    text-align: right;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .fund-mobile-price .nav {
+    font-family: 'SF Mono', 'Roboto Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .fund-mobile-price .change {
+    font-size: 11px;
+    border-radius: 999px;
+    padding: 2px 7px;
+    font-weight: 600;
+  }
+
+  .fund-mobile-price.rise .change {
+    color: var(--rise-color);
+    background: var(--rise-bg);
+  }
+
+  .fund-mobile-price.fall .change {
+    color: var(--fall-color);
+    background: var(--fall-bg);
+  }
+
+  .fund-mobile-metrics {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .fund-mobile-metric {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .fund-mobile-metric .label {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .fund-mobile-metric .value {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fund-mobile-metric .sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+    min-height: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fund-mobile-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .fund-mobile-actions .btn-icon {
+    width: 34px;
+    height: 34px;
+    opacity: 0.8;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+  }
+
+  .fund-mobile-detail {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    margin-top: -2px;
   }
 }

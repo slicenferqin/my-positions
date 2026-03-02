@@ -1,4 +1,5 @@
 import type { FundWithEstimation } from '@/types'
+import { IconDeleteStroked } from '@douyinfe/semi-icons'
 import { parseEstimation, formatChangePercent, formatMoney } from '@/services'
 import './FundCard.css'
 
@@ -30,9 +31,9 @@ export function FundCard({ fund, showCostAndProfit = true, onRemove }: FundCardP
           <button
             className="remove-btn"
             onClick={() => onRemove(fund.code)}
-            title="删除基金"
+            title="删除持仓"
           >
-            ×
+            <IconDeleteStroked />
           </button>
         )}
       </div>
@@ -76,14 +77,14 @@ export function FundCard({ fund, showCostAndProfit = true, onRemove }: FundCardP
                 <span className="value">¥{formatMoney(fund.cost, 2)}</span>
               </div>
               <div className="position-row">
-                <span className="label">持仓收益</span>
+                <span className="label">累计盈亏</span>
                 <span className={`value ${profit >= 0 ? 'rise' : 'fall'}`}>
                   {profit >= 0 ? '+' : ''}¥{formatMoney(profit, 2)}
                   <small>({profitPercent >= 0 ? '+' : ''}{formatMoney(profitPercent, 2)}%)</small>
                 </span>
               </div>
               <div className="position-row">
-                <span className="label">今日收益</span>
+                <span className="label">今日盈亏</span>
                 <span className={`value ${todayProfit >= 0 ? 'rise' : 'fall'}`}>
                   {todayProfit >= 0 ? '+' : ''}¥{formatMoney(todayProfit, 2)}
                   <small>({todayProfitPercent >= 0 ? '+' : ''}{formatMoney(todayProfitPercent, 2)}%)</small>

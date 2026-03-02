@@ -1,0 +1,342 @@
+/* 全局布局样式 */
+
+/* 容器 */
+.app-container {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(22, 119, 255, 0.08), transparent 36%),
+    radial-gradient(circle at 100% 0%, rgba(82, 196, 26, 0.06), transparent 32%),
+    var(--semi-color-bg-1);
+}
+
+/* 头部 */
+.app-header {
+  background-color: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid var(--semi-color-border);
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.app-header-main {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+}
+
+.app-header-desktop-tabs {
+  min-width: 0;
+}
+
+.app-tabs-desktop {
+  min-width: 0;
+}
+
+.app-header-mobile-tabs {
+  display: none;
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+
+.app-logo {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--semi-color-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-name {
+  white-space: nowrap;
+}
+
+/* 主内容区 */
+.app-content {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 18px 24px 30px;
+}
+
+.app-content .semi-card {
+  border-radius: 12px;
+  border: 1px solid var(--semi-color-border);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.05);
+}
+
+.app-content .semi-card .semi-card-header {
+  border-bottom: 1px solid rgba(229, 230, 235, 0.7);
+}
+
+.app-content .semi-card .semi-card-body {
+  padding: 16px 18px;
+}
+
+/* 卡片网格 */
+.card-grid {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.card-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.card-grid-3 {
+  grid-template-columns: minmax(270px, 1fr) minmax(340px, 1.1fr) minmax(270px, 1fr);
+  align-items: start;
+}
+
+.card-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.card-grid-2 > * {
+  min-width: 0;
+  align-self: start;
+}
+
+.card-grid-3 > * {
+  min-width: 0;
+  align-self: start;
+}
+
+/* 响应式 */
+@media (max-width: 1200px) {
+  .card-grid-3,
+  .card-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 市场脉搏 */
+.market-pulse {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.market-pulse-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--semi-color-fill-0);
+  border: 1px solid var(--semi-color-border);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.market-pulse-name {
+  color: var(--semi-color-text-1);
+}
+
+.market-pulse-value {
+  font-weight: 500;
+}
+
+/* 用户信息 */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.user-info:hover {
+  background-color: var(--semi-color-fill-0);
+  border-color: var(--semi-color-border);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--semi-color-primary), var(--semi-color-primary-hover));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .app-header-main {
+    min-height: 58px;
+  }
+
+  .app-header-left {
+    gap: 12px;
+  }
+
+  .app-header-desktop-tabs {
+    display: none;
+  }
+
+  .app-header-mobile-tabs {
+    display: block;
+  }
+
+  .app-tabs-mobile .semi-tabs-bar {
+    margin-bottom: 0;
+  }
+
+  .app-tabs-mobile .semi-tabs-tab {
+    white-space: nowrap;
+    font-size: 13px;
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 6px 12px 8px;
+  }
+
+  .app-header-main {
+    min-height: 44px;
+    gap: 10px;
+  }
+
+  .app-logo {
+    font-size: 16px;
+  }
+
+  .app-content {
+    padding: 14px 10px 20px;
+  }
+
+  .app-content .semi-card .semi-card-body {
+    padding: 12px;
+  }
+
+  .card-grid-2,
+  .card-grid-3,
+  .card-grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .market-pulse {
+    display: none;
+  }
+
+  .user-info {
+    padding: 3px;
+    border: none;
+  }
+
+  .user-name {
+    display: none;
+  }
+}
+
+/* Tab 内容区 */
+.tab-content {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--semi-color-text-2);
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state-text {
+  font-size: 14px;
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+}
+
+/* 工具类 */
+.flex {
+  display: flex;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gap-8 {
+  gap: 8px;
+}
+
+.gap-16 {
+  gap: 16px;
+}
+
+.gap-24 {
+  gap: 24px;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
+}
+
+.mb-24 {
+  margin-bottom: 24px;
+}
+
+.mt-16 {
+  margin-top: 16px;
+}
+
+.mt-24 {
+  margin-top: 24px;
+}

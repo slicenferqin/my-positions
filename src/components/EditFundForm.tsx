@@ -1,7 +1,7 @@
 import { useState } from 'react'
+import { Modal, InputNumber, Radio, RadioGroup, Toast } from '@douyinfe/semi-ui'
 import type { FundWithEstimation } from '@/types'
 import { formatMoney } from '@/services'
-import './EditFundForm.css'
 
 interface EditFundFormProps {
   fund: FundWithEstimation
@@ -12,141 +12,121 @@ interface EditFundFormProps {
 type InputMode = 'cost' | 'price'
 
 export function EditFundForm({ fund, onSave, onCancel }: EditFundFormProps) {
-  const [shares, setShares] = useState(fund.shares.toString())
-  const [inputMode, setInputMode] = useState<InputMode>('price')
-
-  // 成本价（单价）
   const initialCostPrice = fund.shares > 0 ? fund.cost / fund.shares : 0
-  const [costPrice, setCostPrice] = useState(initialCostPrice.toFixed(4))
+  const [shares, setShares] = useState(fund.shares)
+  const [inputMode, setInputMode] = useState<InputMode>('price')
+  const [costPrice, setCostPrice] = useState(initialCostPrice)
+  const [totalCost, setTotalCost] = useState(fund.cost)
 
-  // 总成本金额
-  const [totalCost, setTotalCost] = useState(fund.cost.toString())
+  const calculatedTotalCost = inputMode === 'price' ? shares * costPrice : totalCost
+  const calculatedCostPrice = inputMode === 'cost' && shares > 0 ? totalCost / shares : costPrice
 
-  const [error, setError] = useState('')
-
-  const sharesNum = parseFloat(shares) || 0
-  const costPriceNum = parseFloat(costPrice) || 0
-  const totalCostNum = parseFloat(totalCost) || 0
-
-  // 根据输入模式计算显示值
-  const calculatedTotalCost = inputMode === 'price' ? sharesNum * costPriceNum : totalCostNum
-  const calculatedCostPrice = inputMode === 'cost' && sharesNum > 0 ? totalCostNum / sharesNum : costPriceNum
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
-    if (sharesNum < 0) {
-      setError('份额不能为负数')
+  const handleSubmit = () => {
+    if (shares < 0) {
+      Toast.error('份额不能为负数')
       return
     }
 
-    const finalCost = inputMode === 'price' ? sharesNum * costPriceNum : totalCostNum
+    const finalCost = inputMode === 'price' ? shares * costPrice : totalCost
 
     if (finalCost < 0) {
-      setError('成本不能为负数')
+      Toast.error('成本不能为负数')
       return
     }
 
     if (!fund.id) return
     onSave(fund.id, {
-      shares: sharesNum,
+      shares,
       cost: finalCost,
     })
   }
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="edit-fund-form" onClick={(e) => e.stopPropagation()}>
-        <h3>
+    <Modal
+      title={
+        <div>
           编辑持仓 - {fund.name}
-          <span className="fund-code">{fund.code}</span>
-        </h3>
+          <span style={{ marginLeft: '8px', fontSize: '13px', color: 'var(--semi-color-text-2)' }}>
+            {fund.code}
+          </span>
+        </div>
+      }
+      visible={true}
+      onCancel={onCancel}
+      onOk={handleSubmit}
+      okText="保存"
+      cancelText="取消"
+      width={480}
+    >
+      <div style={{ display: 'grid', gap: '12px' }}>
+        <label style={{ display: 'grid', gap: '6px' }}>
+          <span style={{ fontSize: '13px', color: 'var(--semi-color-text-2)' }}>持有份额</span>
+          <InputNumber value={shares} onChange={(value) => setShares(Number(value) || 0)} min={0} precision={4} style={{ width: '100%' }} />
+        </label>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>持有份额</label>
-            <input
-              type="number"
-              value={shares}
-              onChange={(e) => setShares(e.target.value)}
-              placeholder="输入份额"
-              min="0"
-              step="any"
+        <div>
+          <div style={{ marginBottom: '8px', fontSize: '14px', fontWeight: 500 }}>
+            输入方式
+          </div>
+          <RadioGroup
+            type="button"
+            value={inputMode}
+            onChange={(e) => setInputMode(e.target.value as InputMode)}
+          >
+            <Radio value="price">输入成本价</Radio>
+            <Radio value="cost">输入总金额</Radio>
+          </RadioGroup>
+        </div>
+
+        {inputMode === 'price' ? (
+          <label style={{ display: 'grid', gap: '6px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--semi-color-text-2)' }}>成本价（单价）</span>
+            <InputNumber
+              value={costPrice}
+              onChange={(value) => setCostPrice(Number(value) || 0)}
+              min={0}
+              precision={4}
+              placeholder="如 1.6523"
+              style={{ width: '100%' }}
             />
-          </div>
+          </label>
+        ) : (
+          <label style={{ display: 'grid', gap: '6px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--semi-color-text-2)' }}>持仓成本（总额）</span>
+            <InputNumber
+              value={totalCost}
+              onChange={(value) => setTotalCost(Number(value) || 0)}
+              min={0}
+              precision={2}
+              placeholder="总投入金额"
+              style={{ width: '100%' }}
+            />
+          </label>
+        )}
 
-          <div className="input-mode-selector">
-            <button
-              type="button"
-              className={`mode-btn ${inputMode === 'price' ? 'active' : ''}`}
-              onClick={() => setInputMode('price')}
-            >
-              输入成本价
-            </button>
-            <button
-              type="button"
-              className={`mode-btn ${inputMode === 'cost' ? 'active' : ''}`}
-              onClick={() => setInputMode('cost')}
-            >
-              输入总金额
-            </button>
-          </div>
-
+        <div
+          style={{
+            padding: '12px',
+            background: 'var(--semi-color-bg-1)',
+            borderRadius: '8px',
+            marginTop: '8px',
+          }}
+        >
           {inputMode === 'price' ? (
-            <div className="form-group">
-              <label>成本价（单价）</label>
-              <input
-                type="number"
-                value={costPrice}
-                onChange={(e) => setCostPrice(e.target.value)}
-                placeholder="输入成本价，如 1.6523"
-                min="0"
-                step="any"
-              />
+            <div style={{ fontSize: '14px' }}>
+              <span style={{ color: 'var(--semi-color-text-2)' }}>总成本: </span>
+              <span style={{ fontWeight: 600 }}>¥{formatMoney(calculatedTotalCost, 2)}</span>
             </div>
           ) : (
-            <div className="form-group">
-              <label>持仓成本（总金额）</label>
-              <input
-                type="number"
-                value={totalCost}
-                onChange={(e) => setTotalCost(e.target.value)}
-                placeholder="输入总投入金额"
-                min="0"
-                step="any"
-              />
+            <div style={{ fontSize: '14px' }}>
+              <span style={{ color: 'var(--semi-color-text-2)' }}>成本价: </span>
+              <span style={{ fontWeight: 600 }}>
+                {shares > 0 ? `¥${formatMoney(calculatedCostPrice, 4)}` : '-'}
+              </span>
             </div>
           )}
-
-          <div className="calculated-info">
-            {inputMode === 'price' ? (
-              <>
-                <span className="label">总成本:</span>
-                <span className="value">¥{formatMoney(calculatedTotalCost, 2)}</span>
-              </>
-            ) : (
-              <>
-                <span className="label">成本价:</span>
-                <span className="value">
-                  {sharesNum > 0 ? `¥${formatMoney(calculatedCostPrice, 4)}` : '-'}
-                </span>
-              </>
-            )}
-          </div>
-
-          {error && <div className="form-error">{error}</div>}
-
-          <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={onCancel}>
-              取消
-            </button>
-            <button type="submit" className="btn btn-primary">
-              保存
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </Modal>
   )
 }

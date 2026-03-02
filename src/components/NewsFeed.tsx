@@ -1,738 +1,557 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import ReactMarkdown from 'react-markdown'
-import { fetchNews, analyzePortfolio, fetchFundPortfolio } from '@/services'
-import type { NewsItem, PortfolioAnalysis, FundWithEstimation, Stock, WebhookConfig } from '@/types'
-import { DEFAULT_WEBHOOK_CONFIG } from '@/types'
-import { fetchWebhookConfig, updateWebhookConfig, testWebhook, refreshPortfolioRequest } from '@/services/api'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import {
+  Card,
+  Button,
+  Input,
+  InputNumber,
+  Radio,
+  RadioGroup,
+  Select,
+  Space,
+  Collapse,
+  Switch,
+  Toast,
+  Spin,
+  Tag,
+} from '@douyinfe/semi-ui'
+import { IconSearch, IconRefresh, IconInbox } from '@douyinfe/semi-icons'
 import { useAuth } from '@/context/AuthContext'
+import {
+  fetchNewsFeed,
+  fetchNotificationEndpoints,
+  submitNewsFeedback,
+  testWebhook,
+  updateNotificationEndpoints,
+} from '@/services/api'
+import { NewsAnalysisCard } from '@/components'
+import type { FundWithEstimation, NewsFeedItemV2 } from '@/types'
 import './NewsFeed.css'
-
-function LiveClock() {
-  const [time, setTime] = useState(new Date())
-
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const dateStr = time.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).replace(/\//g, '.')
-  
-  const weekDay = time.toLocaleDateString('zh-CN', { weekday: 'long' })
-  const timeStr = time.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  })
-
-  return (
-    <div className="live-clock">
-      <span className="date">{dateStr}</span>
-      <span className="weekday">{weekDay}</span>
-      <span className="time">{timeStr}</span>
-    </div>
-  )
-}
-
-function SkeletonCard() {
-  return (
-    <div className="news-card skeleton-card">
-      <div className="skeleton skeleton-header"></div>
-      <div className="skeleton skeleton-text"></div>
-      <div className="skeleton skeleton-text"></div>
-      <div className="skeleton skeleton-footer"></div>
-    </div>
-  )
-}
-
-interface NewsCardProps {
-  item: NewsItem
-  isNew?: boolean
-  isHighlighted?: boolean
-  sentiment?: 'bullish' | 'bearish' | null
-  aiAnalysis?: string | null
-  onTagClick?: (tag: string) => void
-}
-
-function NewsCard({ item, isNew, isHighlighted, sentiment, aiAnalysis, onTagClick }: NewsCardProps) {
-  const [expanded, setExpanded] = useState(false)
-  const date = new Date(item.ctime * 1000)
-  const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-  
-  // 智能内容解析
-  let displayTitle = item.title || ''
-  let displayContent = item.content || item.brief || ''
-  
-  // 总是尝试匹配内容开头的【】
-  const match = displayContent.match(/^【(.*?)】/)
-  if (match) {
-    // 总是从内容中移除【...】
-    displayContent = displayContent.substring(match[0].length)
-    
-    // 如果没有 API 提供的标题，就使用提取的标题
-    if (!displayTitle) {
-      displayTitle = match[1]
-    }
-  }
-  
-  // 清理正文开头的标点符号
-  displayContent = displayContent.replace(/^[，。！？：:,. \n]+/, '')
-
-  const isLongContent = displayContent.length > 150
-
-  // 处理图片链接 - 使用本地代理解决防盗链和跨域问题
-  const getProxyImageUrl = (url: string) => {
-    if (!url) return null
-    // 修复：处理逗号分隔的多张图片 URL，取第一张
-    const firstUrl = url.split(',')[0].trim()
-    // 移除 URL 中的 query 参数
-    const cleanUrl = firstUrl.split('?')[0]
-    // 提取路径部分（支持 img.cls.cn 和 image.cls.cn）
-    const path = cleanUrl.replace(/^https?:\/\/(img|image)\.cls\.cn/, '')
-    // 确保以 / 开头
-    const safePath = path.startsWith('/') ? path : `/${path}`
-    return `/img-proxy${safePath}`
-  }
-
-  const imageUrl = item.img ? getProxyImageUrl(item.img) : null
-
-  const contentRef = useRef<HTMLDivElement>(null)
-  const [contentHeight, setContentHeight] = useState<string | undefined>(undefined)
-
-  // 当展开状态改变时，更新高度
-  useEffect(() => {
-    if (expanded && contentRef.current) {
-      // 展开时，设置为实际高度
-      setContentHeight(`${contentRef.current.scrollHeight}px`)
-    } else {
-      // 收起时，移除内联高度，让 CSS 处理（回到默认折叠高度）
-      setContentHeight(undefined)
-    }
-  }, [expanded])
-
-  const handleTextClick = () => {
-    if (!isLongContent) return
-    
-    // 如果是展开状态，且用户正在选中文本，则不折叠
-    if (expanded) {
-      const selection = window.getSelection()
-      if (selection && selection.toString().length > 0) {
-        return
-      }
-    }
-    
-    setExpanded(!expanded)
-  }
-
-  return (
-    <div className={`news-card ${isNew ? 'new-item' : ''} ${isHighlighted ? 'highlighted' : ''}`}>
-      <div className="news-meta-row">
-        <span className="news-time-red">{timeStr}</span>
-        <span className="news-source">财联社 {date.getDate()}日</span>
-        {isHighlighted && <span className="news-badge-holdings">持仓相关</span>}
-      </div>
-      
-      <div className="news-body">
-        <div 
-          ref={contentRef}
-          className={`news-text ${isLongContent ? 'collapsible' : ''} ${expanded ? 'expanded' : ''}`}
-          onClick={handleTextClick}
-          title={isLongContent ? (expanded ? "点击收起" : "点击展开") : undefined}
-          style={contentHeight ? { maxHeight: contentHeight } : undefined}
-        >
-          {displayTitle && (
-            <span className={`news-title-inline ${sentiment || ''}`}>【{displayTitle}】</span>
-          )}
-          {displayContent}
-          
-          {isLongContent && !expanded && (
-            <div className="expand-overlay">
-              <span className="expand-btn">点击展开</span>
-            </div>
-          )}
-        </div>
-        
-        {imageUrl && (
-          <div className="news-image">
-            <img src={imageUrl} alt="新闻配图" referrerPolicy="no-referrer" />
-          </div>
-        )}
-      </div>
-
-      {aiAnalysis && (
-        <div className="news-ai-analysis-card">
-          <div className="analysis-header">
-            <span className="ai-icon">🤖</span> AI 深度解读
-          </div>
-          <div className="analysis-content">
-            <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
-          </div>
-        </div>
-      )}
-
-      <div className="news-footer">
-        <div className="news-tags">
-          {item.subjects?.map(sub => (
-            <span 
-              key={sub.subject_id} 
-              className="news-tag"
-              onClick={(e) => {
-                e.stopPropagation();
-                onTagClick?.(sub.subject_name);
-              }}
-            >
-              {sub.subject_name}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 interface NewsFeedProps {
   funds?: FundWithEstimation[]
 }
 
+interface WebhookConfigState {
+  id?: number
+  enabled: boolean
+  url: string
+  secret: string
+  hasSecret: boolean
+  secretMasked: string
+  cooldownSec: number
+}
+
+const DEFAULT_WEBHOOK_CONFIG: WebhookConfigState = {
+  enabled: false,
+  url: '',
+  secret: '',
+  hasSecret: false,
+  secretMasked: '',
+  cooldownSec: 300,
+}
+
 export function NewsFeed({ funds = [] }: NewsFeedProps) {
   const { token } = useAuth()
-  const [news, setNews] = useState<NewsItem[]>([])
+  const [mode, setMode] = useState<'all' | 'relevant'>('all')
+  const [news, setNews] = useState<NewsFeedItemV2[]>([])
   const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [newIds, setNewIds] = useState<Set<string>>(new Set())
-  
-  // Filter states
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedTag, setSelectedTag] = useState<string | null>(null)
-  const [showImportantOnly, setShowImportantOnly] = useState(false)
-  const [showHoldingsOnly, setShowHoldingsOnly] = useState(false)
-  
-  // Webhook state
-  const [webhookConfig, setWebhookConfig] = useState<WebhookConfig>(DEFAULT_WEBHOOK_CONFIG)
-  const [showWebhookPanel, setShowWebhookPanel] = useState(false)
-  const [webhookLoading, setWebhookLoading] = useState(false)
+  const [sentimentFilter, setSentimentFilter] = useState<string>('')
+  const [impactFilter, setImpactFilter] = useState<string>('')
+
+  const [webhookConfig, setWebhookConfig] = useState<WebhookConfigState>(DEFAULT_WEBHOOK_CONFIG)
   const [webhookSaving, setWebhookSaving] = useState(false)
-  const [webhookTesting, setWebhookTesting] = useState(false)
-  
-  useEffect(() => {
-    if (!token) return
-    setWebhookLoading(true)
-    fetchWebhookConfig(token)
-      .then(({ config }) => setWebhookConfig(config))
-      .catch((error) => console.error('加载 Webhook 配置失败:', error))
-      .finally(() => setWebhookLoading(false))
-  }, [token])
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, string>>({})
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 768px)').matches
+  })
+  const [isFilterExpanded, setIsFilterExpanded] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    return !window.matchMedia('(max-width: 768px)').matches
+  })
+  const latestTopNewsIdRef = useRef('')
+  const initializedRef = useRef(false)
 
-  const handleSaveWebhookConfig = useCallback(async () => {
+  const loadNews = useCallback(async (options?: { silent?: boolean; source?: 'manual' | 'poll' }) => {
     if (!token) return
-    setWebhookSaving(true)
-    try {
-      const { config } = await updateWebhookConfig(token, webhookConfig)
-      setWebhookConfig(config)
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '保存失败')
-    } finally {
-      setWebhookSaving(false)
+    if (!options?.silent) {
+      setLoading(true)
     }
-  }, [token, webhookConfig])
-
-  const handleTestWebhook = useCallback(async () => {
-    if (!token) return
-    setWebhookTesting(true)
     try {
-      const { success } = await testWebhook(token)
-      alert(success ? '测试消息已发送' : '测试失败，请检查配置')
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '测试失败')
-    } finally {
-      setWebhookTesting(false)
-    }
-  }, [token])
+      const response = await fetchNewsFeed(token, {
+        mode,
+        page,
+        perPage: 30,
+        sentiment: sentimentFilter || undefined,
+        impact: impactFilter || undefined,
+      })
 
-  const handleRefreshKeywords = useCallback(async () => {
-    if (!token) return
-    try {
-      await refreshPortfolioRequest(token)
-      alert('已触发后台刷新，稍后自动生效')
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '刷新失败')
-    }
-  }, [token])
-  
-  // 资产透视分析结果
-  const [portfolioAnalysis, setPortfolioAnalysis] = useState<PortfolioAnalysis | null>(null)
-  const [realHoldings, setRealHoldings] = useState<Record<string, Stock[]>>({})
-
-  // 加载真实持仓数据
-  useEffect(() => {
-    let mounted = true
-    
-    async function loadHoldings() {
-      if (funds.length === 0) return
-      
-      const newHoldings: Record<string, Stock[]> = {}
-      // 找出尚未加载持仓数据的基金
-      const pendingFunds = funds.filter(f => !realHoldings[f.code])
-      
-      if (pendingFunds.length === 0) return
-
-      await Promise.all(pendingFunds.map(async (fund) => {
-        try {
-          const stocks = await fetchFundPortfolio(fund.code)
-          if (stocks.length > 0) {
-            newHoldings[fund.code] = stocks.map(s => ({
-              code: s.code,
-              name: s.name,
-              ratio: s.percent
-            }))
-          }
-        } catch (e) {
-          console.warn(`Failed to load portfolio for ${fund.code}`, e)
-        }
-      }))
-      
-      if (mounted && Object.keys(newHoldings).length > 0) {
-        setRealHoldings(prev => ({ ...prev, ...newHoldings }))
+      const nextItems = response.items || []
+      const nextTopNewsId = nextItems[0]?.news.id || ''
+      if (
+        initializedRef.current &&
+        options?.source === 'poll' &&
+        nextTopNewsId &&
+        latestTopNewsIdRef.current &&
+        nextTopNewsId !== latestTopNewsIdRef.current
+      ) {
+        const previousTopIndex = nextItems.findIndex((item) => item.news.id === latestTopNewsIdRef.current)
+        const newCount = previousTopIndex > 0 ? previousTopIndex : 1
+        Toast.info(`检测到 ${newCount} 条新情报，已自动更新`)
       }
-    }
-    
-    loadHoldings()
-    
-    return () => { mounted = false }
-  }, [funds]) // 这里依赖 funds，当基金列表变化时触发
 
-  // 当持仓或持仓数据变化时，进行资产透视分析
-  useEffect(() => {
-    if (funds.length > 0) {
-      const analysis = analyzePortfolio(funds, realHoldings)
-      setPortfolioAnalysis(analysis)
-    } else {
-      setPortfolioAnalysis(null)
-    }
-  }, [funds, realHoldings])
-
-  const loadNews = async (isAutoRefresh = false, loadMore = false) => {
-    if (!isAutoRefresh && !loadMore) setLoading(true)
-    if (loadMore) setLoadingMore(true)
-
-    try {
-      // 如果是加载更多，使用当前列表中最后一条的时间作为 maxTime
-      const maxTime = loadMore && news.length > 0 ? news[news.length - 1].ctime : undefined
-      const data = await fetchNews({ limit: loadMore ? 20 : 50, maxTime })
-      
-      if (data && data.length > 0) {
-        setNews(prev => {
-          if (loadMore) {
-            // 过滤重复
-            const existingIds = new Set(prev.map(n => n.id || String(n.ctime)))
-            const newItems = data.filter(n => !existingIds.has(n.id || String(n.ctime)))
-            return [...prev, ...newItems]
-          }
-
-          // 如果是第一次加载，直接设置
-          if (prev.length === 0) return data
-          
-          // 找出新条目
-          const prevIds = new Set(prev.map(item => item.id || String(item.ctime)))
-          const currentNewIds = new Set<string>()
-          const newItems: NewsItem[] = []
-          
-          data.forEach(item => {
-            const id = item.id || String(item.ctime)
-            if (!prevIds.has(id)) {
-              currentNewIds.add(id)
-              newItems.push(item)
-            }
-          })
-          
-          if (currentNewIds.size > 0) {
-            setNewIds(currentNewIds)
-            setTimeout(() => {
-              setNewIds(new Set())
-            }, 3000)
-            
-            // 合并新数据，去重
-            const existingIds = new Set(data.map(n => n.id || String(n.ctime)))
-            const oldItems = prev.filter(n => !existingIds.has(n.id || String(n.ctime)))
-            
-            return [...data, ...oldItems]
-          }
-          
-          return prev
-        })
+      setNews(nextItems)
+      setTotal(response.total)
+      if (nextTopNewsId) {
+        latestTopNewsIdRef.current = nextTopNewsId
+      }
+      initializedRef.current = true
+    } catch (error) {
+      if (!options?.silent) {
+        Toast.error('加载失败: ' + (error as Error).message)
       }
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }
-
-  const [aiAnalysisResults, setAiAnalysisResults] = useState<Record<string, string>>({})
-  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
-
-  const analyzeItem = useCallback((item: NewsItem) => {
-    // heuristic for importance since level is not in type
-    let isImportant = (item.reading_num || 0) > 50000
-    let isHighlighted = false
-    let sentiment: 'bullish' | 'bearish' | null = null
-
-    // Check for portfolio keywords
-    if (portfolioAnalysis?.keywords) {
-      const content = (item.title + item.content).toLowerCase()
-      for (const keyword of portfolioAnalysis.keywords) {
-        if (content.includes(keyword.toLowerCase())) {
-          isHighlighted = true
-          break
-        }
+      if (!options?.silent) {
+        setLoading(false)
       }
     }
-
-    // Basic sentiment analysis (simple heuristic)
-    if (item.content.includes('利好') || item.content.includes('上涨') || item.content.includes('突破')) {
-      sentiment = 'bullish'
-    } else if (item.content.includes('利空') || item.content.includes('下跌') || item.content.includes('跌破')) {
-      sentiment = 'bearish'
-    }
-
-    return { isImportant, isHighlighted, sentiment }
-  }, [portfolioAnalysis])
-
-  // Automatic AI Analysis for highlighted items - 已禁用
-  // useEffect(() => {
-  //   if (!portfolioAnalysis || news.length === 0) return
-
-  //   const processQueue = async () => {
-  //     // Find items that are highlighted, not analyzed, and not currently analyzing
-  //     const candidates = news.filter(item => {
-  //       const id = item.id || String(item.ctime)
-  //       const { isHighlighted } = analyzeItem(item)
-  //       return isHighlighted && !aiAnalysisResults[id] && !analyzingIds.has(id)
-  //     })
-
-  //     // Take only the top 5 most recent to avoid flood
-  //     const batch = candidates.slice(0, 5)
-      
-  //     if (batch.length === 0) return
-
-  //     // Mark as analyzing
-  //     setAnalyzingIds(prev => {
-  //       const next = new Set(prev)
-  //       batch.forEach(item => next.add(item.id || String(item.ctime)))
-  //       return next
-  //     })
-
-  //     // Process batch
-  //     await Promise.allSettled(batch.map(async (item) => {
-  //       const id = item.id || String(item.ctime)
-  //       try {
-  //         const stocks = Array.from(portfolioAnalysis.keywords)
-  //         const prompt = generateSingleNewsAnalysisPrompt(item, stocks)
-  //         const result = await callAIAnalysis(prompt)
-          
-  //         setAiAnalysisResults(prev => ({
-  //           ...prev,
-  //           [id]: result
-  //         }))
-  //       } catch (error) {
-  //         console.error(`AI analysis failed for ${id}`, error)
-  //       } finally {
-  //         setAnalyzingIds(prev => {
-  //           const next = new Set(prev)
-  //           next.delete(id)
-  //           return next
-  //         })
-  //       }
-  //     }))
-  //   }
-
-  //   processQueue()
-  // }, [news, portfolioAnalysis, analyzeItem, aiAnalysisResults, analyzingIds])
+  }, [token, mode, page, sentimentFilter, impactFilter])
 
   useEffect(() => {
     loadNews()
-    // 每60秒自动刷新
-    const timer = setInterval(() => loadNews(true), 60000)
-    return () => clearInterval(timer)
+  }, [loadNews])
+
+  useEffect(() => {
+    if (!token || !autoRefresh) return undefined
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      loadNews({ silent: true, source: 'poll' })
+    }, 30000)
+    return () => window.clearInterval(timer)
+  }, [token, autoRefresh, loadNews])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const media = window.matchMedia('(max-width: 768px)')
+    const onMediaChange = () => {
+      setIsMobile(media.matches)
+    }
+    onMediaChange()
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onMediaChange)
+      return () => media.removeEventListener('change', onMediaChange)
+    }
+
+    media.addListener(onMediaChange)
+    return () => media.removeListener(onMediaChange)
   }, [])
 
-  // Infinite Scroll Handler
   useEffect(() => {
-    const onScroll = () => {
-      if (loading || loadingMore || searchTerm || selectedTag || showImportantOnly) return
-      const scrollTop = window.scrollY
-      const clientHeight = window.innerHeight
-      const scrollHeight = document.documentElement.scrollHeight
-      
-      if (scrollHeight - scrollTop - clientHeight < 200) {
-        loadNews(false, true)
-      }
+    setIsFilterExpanded(!isMobile)
+  }, [isMobile])
+
+  useEffect(() => {
+    if (!token) return
+    fetchNotificationEndpoints(token)
+      .then(({ endpoints }) => {
+        const webhook = endpoints.find((item) => item.channelType === 'webhook')
+        if (!webhook) {
+          setWebhookConfig(DEFAULT_WEBHOOK_CONFIG)
+          return
+        }
+
+        setWebhookConfig({
+          id: webhook.id,
+          enabled: Boolean(webhook.enabled),
+          url: webhook.endpointUrl || '',
+          secret: '',
+          hasSecret: Boolean(webhook.hasSecret),
+          secretMasked: webhook.secretMasked || '',
+          cooldownSec: Number(webhook.cooldownSec) || 300,
+        })
+      })
+      .catch(() => {})
+  }, [token])
+
+  const handleSaveWebhook = async () => {
+    if (!token) return
+    setWebhookSaving(true)
+    try {
+      await updateNotificationEndpoints(token, [
+        {
+          id: webhookConfig.id,
+          channelType: 'webhook',
+          endpointUrl: webhookConfig.url,
+          enabled: webhookConfig.enabled,
+          cooldownSec: webhookConfig.cooldownSec,
+          quietHours: {},
+          secret: webhookConfig.secret || undefined,
+        },
+      ])
+      Toast.success('推送配置已保存')
+      setWebhookConfig((prev) => ({
+        ...prev,
+        hasSecret: prev.hasSecret || Boolean(prev.secret),
+        secretMasked: prev.secret ? '****' : prev.secretMasked,
+        secret: '',
+      }))
+    } catch (error) {
+      Toast.error('保存失败: ' + (error as Error).message)
+    } finally {
+      setWebhookSaving(false)
     }
-    
-    window.addEventListener('scroll', onScroll)
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [loading, loadingMore, searchTerm, selectedTag, showImportantOnly, news]) // dependency on news is needed to get latest maxTime
+  }
 
-  // Filtered News
-  const filteredNews = useMemo(() => {
-    return news.filter(item => {
-      const { isImportant, isHighlighted } = analyzeItem(item)
-      const text = (item.title + item.content + (item.subjects?.map(s => s.subject_name).join(' ') || '')).toLowerCase()
-      
-      // Filter by Search
-      if (searchTerm && !text.includes(searchTerm.toLowerCase())) return false
-      
-      // Filter by Tag
-      if (selectedTag) {
-        const hasTag = item.subjects?.some(s => s.subject_name === selectedTag)
-        if (!hasTag) return false
-      }
-      
-      // Filter by Importance
-      if (showImportantOnly && !isImportant) return false
+  const handleTestWebhook = async () => {
+    if (!token) return
+    try {
+      await testWebhook(token)
+      Toast.success('测试消息已发送')
+    } catch (error) {
+      Toast.error('测试失败: ' + (error as Error).message)
+    }
+  }
 
-      // Filter by Holdings
-      if (showHoldingsOnly) {
-        // 使用 analyzeItem 已经计算出的高亮状态（基于透视关键词）
-        if (!isHighlighted) return false
-      }
-      
-      return true
-    })
-  }, [news, searchTerm, selectedTag, showImportantOnly, showHoldingsOnly, portfolioAnalysis, analyzeItem])
+  const handleFeedback = async (newsId: string, action: 'useful' | 'not_useful' | 'already_acted') => {
+    if (!token) return
+    try {
+      await submitNewsFeedback(token, newsId, { action })
+      setFeedbackMap((prev) => ({ ...prev, [newsId]: action }))
+      Toast.success('已记录反馈')
+    } catch (error) {
+      Toast.error('反馈失败: ' + (error as Error).message)
+    }
+  }
+
+  const filteredNews = useMemo(
+    () =>
+      news.filter((item) => {
+        if (!searchTerm) return true
+        const term = searchTerm.toLowerCase()
+        return (
+          item.news.title?.toLowerCase().includes(term) ||
+          item.news.content?.toLowerCase().includes(term) ||
+          item.news.brief?.toLowerCase().includes(term)
+        )
+      }),
+    [news, searchTerm]
+  )
+
+  const bullishCount = filteredNews.filter((item) => item.globalAnalysis?.sentiment === 'bullish').length
+  const bearishCount = filteredNews.filter((item) => item.globalAnalysis?.sentiment === 'bearish').length
+  const relevantCount = filteredNews.filter((item) => (item.relevance?.relevanceScore || 0) > 0).length
+  const pageCount = Math.max(1, Math.ceil(total / 30))
+
+  const activeFilters = [
+    sentimentFilter ? `情绪:${sentimentFilter === 'bullish' ? '利好' : sentimentFilter === 'bearish' ? '利空' : '中性'}` : '',
+    impactFilter ? `影响:${impactFilter === 'major' ? '重大' : impactFilter === 'moderate' ? '一般' : '轻微'}` : '',
+    searchTerm ? `关键词:${searchTerm}` : '',
+  ].filter(Boolean)
 
   return (
-    <div className="news-feed">
-      <div className="news-feed-header">
-        <LiveClock />
-        <div className="update-indicator">
-          <span className="update-text">电报持续更新中</span>
-          <div className="equalizer">
-            <div className="equalizer-bar"></div>
-            <div className="equalizer-bar"></div>
-            <div className="equalizer-bar"></div>
+    <section className="news-feed">
+      <Card className="news-toolbar-card">
+        <div className="news-toolbar-header">
+          <div>
+            <h3>智能情报流</h3>
+            <p>全局统一解读 + 持仓个性化洞察，30 秒完成决策判断</p>
           </div>
-        </div>
-        
-        {/* Controls */}
-        <div className="news-controls">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
-            <input 
-              type="text" 
-              className="search-input"
-              placeholder="搜索资讯 / 代码 / 关键词..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-          
-          <div className="filter-toggle" onClick={() => setShowHoldingsOnly(!showHoldingsOnly)}>
-            <div className={`toggle-switch ${showHoldingsOnly ? 'active' : ''}`}>
-              <div className="toggle-knob"></div>
-            </div>
-            <span>只看持仓</span>
-          </div>
-
-          <div className="filter-toggle" onClick={() => setShowImportantOnly(!showImportantOnly)}>
-            <div className={`toggle-switch ${showImportantOnly ? 'active' : ''}`}>
-              <div className="toggle-knob"></div>
-            </div>
-            <span>只看重要</span>
-          </div>
-
-          <div className="filter-toggle" onClick={() => setShowWebhookPanel(!showWebhookPanel)}>
-            <div className={`toggle-switch ${webhookConfig.enabled ? 'active' : ''}`}>
-              <div className="toggle-knob"></div>
-            </div>
-            <span>Webhook{webhookConfig.enabled ? '已启用' : '推送'}</span>
-          </div>
+          <Tag color="blue" type="light">
+            当前持仓 {funds.length} 只
+          </Tag>
         </div>
 
-        {/* Webhook Configuration Panel */}
-        {showWebhookPanel && (
-          <div className="webhook-panel" style={{ marginTop: '16px', padding: '16px', background: 'var(--card-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>Webhook 配置 {webhookLoading && '（加载中...）'}</h4>
-              <button 
-                onClick={() => setShowWebhookPanel(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}
+        <div className="news-toolbar-controls">
+          <div className="news-toolbar-primary">
+            <div className="news-primary-mode">
+              <RadioGroup
+                type="button"
+                value={mode}
+                onChange={(e) => {
+                  setMode(e.target.value as 'all' | 'relevant')
+                  setPage(1)
+                }}
               >
-                ✕
-              </button>
+                <Radio value="all">全部新闻</Radio>
+                <Radio value="relevant">与我相关</Radio>
+              </RadioGroup>
             </div>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                Webhook URL
-              </label>
-              <input
-                type="text"
-                value={webhookConfig.url}
-                onChange={(e) => setWebhookConfig((prev) => ({ ...prev, url: e.target.value }))}
-                placeholder="https://..."
-                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '13px' }}
+            <div className="news-primary-search">
+              <Input
+                className="news-search-input"
+                prefix={<IconSearch />}
+                placeholder="搜索标题或正文"
+                value={searchTerm}
+                onChange={setSearchTerm}
               />
             </div>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                密钥（可选，用于签名验证）
-              </label>
-              <input
-                type="password"
-                value={webhookConfig.secret || ''}
-                onChange={(e) => setWebhookConfig((prev) => ({ ...prev, secret: e.target.value }))}
-                placeholder="可选"
-                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '13px' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={webhookConfig.holdingsOnly}
-                  onChange={(e) => setWebhookConfig((prev) => ({ ...prev, holdingsOnly: e.target.checked }))}
-                />
-                仅发送持仓相关
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={webhookConfig.enabled}
-                  onChange={(e) => setWebhookConfig((prev) => ({ ...prev, enabled: e.target.checked }))}
-                />
-                启用推送
-              </label>
-            </div>
-
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                推送间隔（分钟）
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={webhookConfig.interval}
-                onChange={(e) => setWebhookConfig((prev) => ({ ...prev, interval: Math.max(1, parseInt(e.target.value) || 1) }))}
-                style={{ width: '120px', padding: '6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
-              <button
-                onClick={handleSaveWebhookConfig}
-                disabled={webhookSaving || !token}
-                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--primary-color)', color: '#fff' }}
+            <div className="news-primary-actions">
+              <Button icon={<IconRefresh />} onClick={() => loadNews({ source: 'manual' })}>
+                刷新
+              </Button>
+              <Button
+                type="tertiary"
+                onClick={() => setIsFilterExpanded((prev) => !prev)}
               >
-                {webhookSaving ? '保存中...' : '保存配置'}
-              </button>
-              <button
-                onClick={handleTestWebhook}
-                disabled={!webhookConfig.enabled || webhookTesting}
-                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-primary)' }}
-              >
-                {webhookTesting ? '测试中...' : '发送测试'}
-              </button>
-              <button
-                onClick={handleRefreshKeywords}
-                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px dashed var(--border-color)', background: 'transparent', color: 'var(--text-secondary)' }}
-              >
-                刷新持仓关键词
-              </button>
-            </div>
-
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span>状态: {webhookConfig.enabled ? '已启用' : '未启用'}，仅持仓：{webhookConfig.holdingsOnly ? '是' : '否'}</span>
-              <span>最后发送: {webhookConfig.lastSentTime ? new Date(webhookConfig.lastSentTime).toLocaleTimeString('zh-CN') : '暂无记录'}</span>
-              <span>累计推送: {webhookConfig.sentCount ?? 0} 条 | 跟踪关键词: {webhookConfig.keywordsTracked ?? 0}</span>
+                {isFilterExpanded ? '收起筛选' : '更多筛选'}
+              </Button>
             </div>
           </div>
-        )}
-        
-        {/* Portfolio X-Ray Summary */}
-        {showHoldingsOnly && portfolioAnalysis && (
-          <div className="portfolio-insight">
-            <div className="insight-icon">🔍</div>
-            <div className="insight-content">
-              <div className="insight-title">持仓深度透视</div>
-              <div className="insight-text">{portfolioAnalysis.summary}</div>
+
+          <div className={`news-toolbar-advanced ${isFilterExpanded ? 'expanded' : 'collapsed'}`}>
+            <Select
+              placeholder="情绪筛选"
+              value={sentimentFilter}
+              onChange={(value) => setSentimentFilter((value as string) || '')}
+              style={{ width: 128 }}
+            >
+              <Select.Option value="">全部情绪</Select.Option>
+              <Select.Option value="bullish">利好</Select.Option>
+              <Select.Option value="bearish">利空</Select.Option>
+              <Select.Option value="neutral">中性</Select.Option>
+            </Select>
+
+            <Select
+              placeholder="影响等级"
+              value={impactFilter}
+              onChange={(value) => setImpactFilter((value as string) || '')}
+              style={{ width: 128 }}
+            >
+              <Select.Option value="">全部影响</Select.Option>
+              <Select.Option value="major">重大</Select.Option>
+              <Select.Option value="moderate">一般</Select.Option>
+              <Select.Option value="minor">轻微</Select.Option>
+            </Select>
+
+            <div className="news-auto-refresh">
+              <Switch checked={autoRefresh} onChange={setAutoRefresh} size="small" />
+              <Tag size="small" type="ghost">{autoRefresh ? '自动刷新 30s' : '自动刷新关闭'}</Tag>
             </div>
           </div>
-        )}
-        
-        {/* Active Tag Filter Indicator */}
-        {selectedTag && (
-          <div style={{ marginTop: '12px' }}>
-            <span className="news-tag" style={{ background: 'var(--primary-color)', color: 'white' }}>
-              {selectedTag}
-              <span 
-                style={{ marginLeft: '6px', cursor: 'pointer' }} 
-                onClick={() => setSelectedTag(null)}
-              >
-                ✕
-              </span>
-            </span>
-            <span className="active-filter-tag">已筛选标签</span>
+        </div>
+
+        {activeFilters.length > 0 && (
+          <div className="news-active-filters">
+            {activeFilters.map((label) => (
+              <Tag key={label} size="small" type="light">
+                {label}
+              </Tag>
+            ))}
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="news-list">
-        {loading && news.length === 0 ? (
-          // Initial Loading Skeletons
-          Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
-        ) : (
-          <>
-            {filteredNews.map(item => {
-              const { sentiment, isHighlighted } = analyzeItem(item)
-              const id = item.id || String(item.ctime)
-              return (
-                <NewsCard 
-                  key={id} 
-                  item={item} 
-                  isHighlighted={isHighlighted}
-                  isNew={newIds.has(id)}
-                  sentiment={sentiment}
-                  aiAnalysis={aiAnalysisResults[id]}
-                  onTagClick={tag => {
-                    setSelectedTag(tag)
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }}
-                />
-              )
-            })}
-            
-            {filteredNews.length === 0 && !loading && (
-              <div className="empty-state">
-                {showHoldingsOnly ? '暂无持仓相关资讯' : (searchTerm || selectedTag ? '没有找到相关资讯' : '暂无资讯')}
-              </div>
-            )}
-            
-            {loadingMore && (
-              <div className="load-more-trigger">
-                <div className="equalizer">
-                  <div className="equalizer-bar"></div>
-                  <div className="equalizer-bar"></div>
-                  <div className="equalizer-bar"></div>
+      <div className="news-feed-layout">
+        <div className="news-feed-main">
+          {loading ? (
+            <Card className="news-state-card">
+              <Spin size="large" />
+            </Card>
+          ) : filteredNews.length === 0 ? (
+            <Card className="news-state-card">
+              <div className="news-empty">
+                <div className="news-empty-icon">
+                  <IconInbox size="extra-large" />
                 </div>
-                <span style={{ marginLeft: '8px' }}>加载更多...</span>
+                <div className="news-empty-title">暂无符合条件的新闻</div>
+                <div className="news-empty-subtitle">调整筛选条件或稍后刷新再试</div>
               </div>
-            )}
-            
-            {!loadingMore && news.length > 0 && !searchTerm && !selectedTag && !showImportantOnly && (
-              <div className="load-more-trigger">
-                <span>下滑加载更多</span>
+            </Card>
+          ) : (
+            <div className="news-list">
+              {filteredNews.map((item) => {
+                const relevanceScore = item.relevance?.relevanceScore || 0
+                const matchedEntities = (item.whyRelevant?.matchedEntities || []).filter((target) => target.type !== 'stock')
+                const feedbackAction = feedbackMap[item.news.id]
+
+                return (
+                  <Card key={item.news.id} className={`news-item-card ${relevanceScore > 0 ? 'is-relevant' : ''}`}>
+                    <div className="news-item-meta">
+                      <div className="news-item-meta-left">
+                        <span className="news-item-time">
+                          {new Date(item.news.ctime * 1000).toLocaleString('zh-CN')}
+                        </span>
+                        <Tag size="small" type="ghost">财联社</Tag>
+                        {relevanceScore > 0 && <Tag color="red" size="small">持仓相关</Tag>}
+                      </div>
+                    </div>
+
+                    {item.news.title && <h4 className="news-item-title">{item.news.title}</h4>}
+
+                    <div className="news-item-content">{item.news.content || item.news.brief}</div>
+
+                    {item.globalAnalysis && <NewsAnalysisCard analysis={item.globalAnalysis} relevance={item.relevance} />}
+
+                    {relevanceScore > 0 && (
+                      <div className="news-relevance-reason">
+                        <div className="news-relevance-title">为什么与我相关</div>
+                        <div className="news-relevance-tags">
+                          <Space wrap spacing={4}>
+                            {matchedEntities.length > 0
+                              ? matchedEntities.slice(0, 5).map((target, index) => (
+                                  <Tag key={`${target.type}-${target.name}-${index}`} size="small" type="light">
+                                    板块: {target.name}
+                                  </Tag>
+                                ))
+                              : (
+                                <Tag size="small" type="light">
+                                  与持仓板块关联
+                                </Tag>
+                              )}
+                          </Space>
+                        </div>
+                      </div>
+                    )}
+
+                    {item.personalizedInsight && (
+                      <div className="news-personalized-insight">
+                        <div className="news-personalized-title">个性化解读</div>
+                        <div className="news-personalized-summary">{item.personalizedInsight.personalSummary}</div>
+                        <div className="news-personalized-hints">
+                          <div><strong>风险提示：</strong>{item.personalizedInsight.riskHint}</div>
+                          <div><strong>机会提示：</strong>{item.personalizedInsight.opportunityHint}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="news-feedback-actions">
+                      <Space>
+                        <Button
+                          size="small"
+                          type={feedbackAction === 'useful' ? 'primary' : 'tertiary'}
+                          onClick={() => handleFeedback(item.news.id, 'useful')}
+                        >
+                          有帮助
+                        </Button>
+                        <Button
+                          size="small"
+                          type={feedbackAction === 'already_acted' ? 'primary' : 'tertiary'}
+                          onClick={() => handleFeedback(item.news.id, 'already_acted')}
+                        >
+                          已处理
+                        </Button>
+                        <Button
+                          size="small"
+                          type={feedbackAction === 'not_useful' ? 'primary' : 'tertiary'}
+                          onClick={() => handleFeedback(item.news.id, 'not_useful')}
+                        >
+                          忽略
+                        </Button>
+                      </Space>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+
+          {total > 30 && (
+            <div className="news-pagination">
+              <Space>
+                <Button disabled={page === 1} onClick={() => setPage((prev) => prev - 1)}>
+                  上一页
+                </Button>
+                <span>
+                  第 {page} 页 / 共 {pageCount} 页
+                </span>
+                <Button disabled={page >= pageCount} onClick={() => setPage((prev) => prev + 1)}>
+                  下一页
+                </Button>
+              </Space>
+            </div>
+          )}
+        </div>
+
+        <aside className="news-feed-side">
+          <Card title="情报概览" className="news-side-card">
+            <div className="news-metrics">
+              <div className="news-metric">
+                <span className="news-metric-label">当前结果</span>
+                <strong className="news-metric-value">{filteredNews.length}</strong>
               </div>
-            )}
-          </>
-        )}
+              <div className="news-metric">
+                <span className="news-metric-label">持仓相关</span>
+                <strong className="news-metric-value">{relevantCount}</strong>
+              </div>
+              <div className="news-metric">
+                <span className="news-metric-label">利好</span>
+                <strong className="news-metric-value rise">{bullishCount}</strong>
+              </div>
+              <div className="news-metric">
+                <span className="news-metric-label">利空</span>
+                <strong className="news-metric-value fall">{bearishCount}</strong>
+              </div>
+            </div>
+          </Card>
+
+          <Collapse defaultActiveKey={['webhook']} className="news-side-collapse">
+            <Collapse.Panel header="Webhook 推送配置" itemKey="webhook">
+              <Card className="news-side-card">
+                <div className="news-webhook-form">
+                  <label className="news-webhook-field news-webhook-switch">
+                    <span>启用推送</span>
+                    <Switch
+                      checked={webhookConfig.enabled}
+                      onChange={(checked) => setWebhookConfig({ ...webhookConfig, enabled: checked })}
+                    />
+                  </label>
+
+                  <label className="news-webhook-field">
+                    <span>Webhook URL</span>
+                    <Input
+                      placeholder="https://..."
+                      value={webhookConfig.url}
+                      onChange={(value) => setWebhookConfig({ ...webhookConfig, url: value })}
+                    />
+                  </label>
+
+                  <label className="news-webhook-field">
+                    <span>密钥（可选）</span>
+                    <Input
+                      placeholder={webhookConfig.hasSecret ? `已设置 ${webhookConfig.secretMasked}` : '用于签名'}
+                      value={webhookConfig.secret}
+                      onChange={(value) => setWebhookConfig({ ...webhookConfig, secret: value })}
+                    />
+                  </label>
+
+                  <label className="news-webhook-field">
+                    <span>推送间隔（秒）</span>
+                    <InputNumber
+                      value={webhookConfig.cooldownSec}
+                      onChange={(value) =>
+                        setWebhookConfig({
+                          ...webhookConfig,
+                          cooldownSec: Number(value) || DEFAULT_WEBHOOK_CONFIG.cooldownSec,
+                        })
+                      }
+                      min={60}
+                      max={3600}
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                </div>
+
+                <div className="news-webhook-actions">
+                  <Space>
+                    <Button theme="solid" onClick={handleSaveWebhook} loading={webhookSaving}>
+                      保存配置
+                    </Button>
+                    <Button onClick={handleTestWebhook}>发送测试消息</Button>
+                  </Space>
+                </div>
+              </Card>
+            </Collapse.Panel>
+          </Collapse>
+        </aside>
       </div>
-    </div>
+    </section>
   )
 }

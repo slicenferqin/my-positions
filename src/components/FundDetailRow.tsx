@@ -13,12 +13,18 @@ interface FundDetailRowProps {
 export function FundDetailRow({ fund, intradayData: propData }: FundDetailRowProps) {
   const [intradayData, setIntradayData] = useState<IntradayPoint[]>(propData || [])
   const [loading, setLoading] = useState(false)
+  const instrumentType = fund.instrumentType === 'stock' ? 'stock' : 'fund'
+  const isStock = instrumentType === 'stock'
 
   const parsed = fund.estimation ? parseEstimation(fund.estimation) : null
 
   useEffect(() => {
     if (propData && propData.length > 0) {
       setIntradayData(propData)
+      return
+    }
+    if (isStock) {
+      setIntradayData([])
       return
     }
 
@@ -46,7 +52,7 @@ export function FundDetailRow({ fund, intradayData: propData }: FundDetailRowPro
     return () => {
       mounted = false
     }
-  }, [fund.code, propData])
+  }, [fund.code, propData, isStock])
 
   if (!parsed) return null
 
@@ -75,18 +81,18 @@ export function FundDetailRow({ fund, intradayData: propData }: FundDetailRowPro
         <h5>基本信息</h5>
         <div className="info-grid">
           <div className="info-item">
-            <span className="label">估算净值</span>
+            <span className="label">{isStock ? '最新价' : '估算净值'}</span>
             <span className={`value ${parsed.trend}`}>
               {formatMoney(parsed.estimatedNav, 4)}
               <small>{formatChangePercent(parsed.changePercent)}</small>
             </span>
           </div>
           <div className="info-item">
-            <span className="label">上期净值</span>
+            <span className="label">{isStock ? '昨收价' : '上期净值'}</span>
             <span className="value">{formatMoney(parsed.lastNav, 4)}</span>
           </div>
           <div className="info-item">
-            <span className="label">净值日期</span>
+            <span className="label">{isStock ? '交易日期' : '净值日期'}</span>
             <span className="value">{parsed.navDate}</span>
           </div>
           <div className="info-item">
@@ -117,14 +123,14 @@ export function FundDetailRow({ fund, intradayData: propData }: FundDetailRowPro
               <span className="value">¥{formatMoney(currentValue, 2)}</span>
             </div>
             <div className="info-item">
-              <span className="label">持仓收益</span>
+              <span className="label">累计盈亏</span>
               <span className={`value ${profit >= 0 ? 'rise' : 'fall'}`}>
                 {profit >= 0 ? '+' : ''}¥{formatMoney(profit, 2)}
                 <small>({profitPercent >= 0 ? '+' : ''}{formatMoney(profitPercent, 2)}%)</small>
               </span>
             </div>
             <div className="info-item">
-              <span className="label">今日收益</span>
+              <span className="label">今日盈亏</span>
               <span className={`value ${todayProfit >= 0 ? 'rise' : 'fall'}`}>
                 {todayProfit >= 0 ? '+' : ''}¥{formatMoney(todayProfit, 2)}
                 <small>({todayProfitPercent >= 0 ? '+' : ''}{formatMoney(todayProfitPercent, 2)}%)</small>

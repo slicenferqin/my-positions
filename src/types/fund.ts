@@ -35,6 +35,8 @@ export interface Transaction {
  */
 export interface UserFund {
   id?: number
+  instrumentType?: 'fund' | 'stock'
+  market?: string
   code: string
   name: string
   shares: number

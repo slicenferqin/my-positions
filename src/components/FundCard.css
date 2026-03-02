@@ -44,13 +44,17 @@
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 20px;
   cursor: pointer;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+}
+
+.remove-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .remove-btn:hover {

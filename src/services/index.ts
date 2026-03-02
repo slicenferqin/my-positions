@@ -1,6 +1,7 @@
 export {
   fetchFundEstimation,
   fetchMultipleFundEstimations,
+  fetchMultipleStockEstimations,
   getTrendType,
   parseEstimation,
   formatChangePercent,
