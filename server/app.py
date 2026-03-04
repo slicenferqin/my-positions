@@ -78,6 +78,7 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     funds = db.relationship('FundHolding', backref='user', cascade='all, delete-orphan')
+    watchlist_items = db.relationship('WatchlistItem', backref='user', cascade='all, delete-orphan')
     webhook = db.relationship('WebhookConfig', backref='user', uselist=False, cascade='all, delete-orphan')
 
     def to_dict(self):
@@ -135,6 +136,41 @@ class FundHolding(db.Model):
                         result.add(item.lower())
             except json.JSONDecodeError:
                 pass
+        return result
+
+
+class WatchlistItem(db.Model):
+    __tablename__ = 'watchlist_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    instrument_type = db.Column(db.String(16), default='fund', nullable=False)
+    market = db.Column(db.String(8))
+    code = db.Column(db.String(20), nullable=False)
+    name = db.Column(db.String(160), nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'instrument_type', 'code', name='uix_user_watchlist_code'),
+        db.Index('idx_watchlist_user_sort', 'user_id', 'sort_order'),
+        db.Index('idx_watchlist_user_asset', 'user_id', 'instrument_type', 'code'),
+    )
+
+    def keyword_set(self):
+        result = set()
+        if self.name:
+            result.add(self.name.lower())
+        if self.code:
+            code = self.code.lower()
+            result.add(code)
+            compact = re.sub(r'[^a-z0-9]', '', code)
+            if compact:
+                result.add(compact)
+            suffix_match = re.search(r'(\d{6})$', code)
+            if suffix_match:
+                result.add(suffix_match.group(1))
         return result
 
 
@@ -279,6 +315,24 @@ class UserNewsRelevance(db.Model):
         except json.JSONDecodeError:
             reason_codes = []
         filtered_entities = [item for item in matched_entities if isinstance(item, dict) and item.get('type') != 'stock']
+        holding_hit = any((item.get('scope') == 'holding') for item in matched_entities if isinstance(item, dict))
+        watchlist_hit = any((item.get('scope') == 'watchlist') for item in matched_entities if isinstance(item, dict))
+        for reason in reason_codes:
+            if not isinstance(reason, str):
+                continue
+            if reason.startswith('WATCHLIST_'):
+                watchlist_hit = True
+            elif reason.startswith('HOLDING_') or reason in {'STOCK_MATCH', 'SECTOR_MATCH', 'TEXT_MATCH'}:
+                holding_hit = True
+
+        match_scope = 'none'
+        if holding_hit and watchlist_hit:
+            match_scope = 'mixed'
+        elif holding_hit:
+            match_scope = 'holding'
+        elif watchlist_hit:
+            match_scope = 'watchlist'
+
         normalized_sectors = []
         seen = set()
         for name in matched_sectors:
@@ -291,6 +345,16 @@ class UserNewsRelevance(db.Model):
             if item.get('type') == 'sector' and sector_name and sector_name not in seen:
                 seen.add(sector_name)
                 normalized_sectors.append(sector_name)
+        matched_watchlist = []
+        watchlist_seen = set()
+        for item in matched_entities:
+            if not isinstance(item, dict) or item.get('scope') != 'watchlist':
+                continue
+            label = (item.get('name') or '').strip()
+            if not label or label in watchlist_seen:
+                continue
+            watchlist_seen.add(label)
+            matched_watchlist.append(label)
 
         return {
             'newsId': self.news_id,
@@ -299,6 +363,8 @@ class UserNewsRelevance(db.Model):
             'matchedStocks': [],
             'matchedSectors': normalized_sectors,
             'matchedEntities': filtered_entities,
+            'matchScope': match_scope,
+            'matchedWatchlist': matched_watchlist,
             'reasonCodes': reason_codes,
             'personalizedComment': self.personalized_comment,
             'computedAt': int(self.computed_at.timestamp() * 1000) if self.computed_at else None,
@@ -937,6 +1003,74 @@ def fund_to_dict(fund: FundHolding):
     }
 
 
+def watchlist_to_dict(item: WatchlistItem):
+    return {
+        'id': item.id,
+        'instrumentType': normalize_instrument_type(item.instrument_type),
+        'market': item.market or '',
+        'code': item.code,
+        'name': item.name,
+        'sortOrder': item.sort_order or 0,
+        'addedAt': int(item.added_at.timestamp() * 1000) if item.added_at else None,
+        'updatedAt': int(item.updated_at.timestamp() * 1000) if item.updated_at else None,
+    }
+
+
+def find_holding_conflict(
+    user_id: int,
+    instrument_type: str,
+    code: str,
+    exclude_fund_id: int | None = None,
+):
+    normalized_code = (code or '').strip().upper()
+    query = FundHolding.query.filter_by(user_id=user_id)
+    if exclude_fund_id is not None:
+        query = query.filter(FundHolding.id != exclude_fund_id)
+    candidates = query.all()
+    for candidate in candidates:
+        candidate_code = (candidate.code or '').strip().upper()
+        if candidate_code != normalized_code:
+            continue
+        if normalize_instrument_type(candidate.instrument_type) == instrument_type:
+            return candidate
+    return None
+
+
+def find_watchlist_conflict(
+    user_id: int,
+    instrument_type: str,
+    code: str,
+    exclude_item_id: int | None = None,
+):
+    normalized_code = (code or '').strip().upper()
+    query = WatchlistItem.query.filter_by(user_id=user_id)
+    if exclude_item_id is not None:
+        query = query.filter(WatchlistItem.id != exclude_item_id)
+    candidates = query.all()
+    for candidate in candidates:
+        candidate_code = (candidate.code or '').strip().upper()
+        if candidate_code != normalized_code:
+            continue
+        if normalize_instrument_type(candidate.instrument_type) == instrument_type:
+            return candidate
+    return None
+
+
+def remove_watchlist_conflict(user_id: int, instrument_type: str, code: str):
+    removed = 0
+    normalized_code = (code or '').strip().upper()
+    conflicts = WatchlistItem.query.filter_by(user_id=user_id).all()
+    for item in conflicts:
+        item_code = (item.code or '').strip().upper()
+        if item_code != normalized_code:
+            continue
+        if normalize_instrument_type(item.instrument_type) != instrument_type:
+            continue
+        db.session.delete(item)
+        removed += 1
+    return removed
+
+
 def parse_holding_payload(data: dict, default_instrument_type: str | None = None):
     instrument_type = normalize_instrument_type(
         data.get('instrumentType') or data.get('instrument_type') or default_instrument_type or 'fund'
@@ -1137,9 +1271,11 @@ def build_event_context(news_id: str):
 
 
 def to_news_feed_item(news: NewsCache, analysis: NewsAnalysis | None, relevance: UserNewsRelevance | None, insight: UserNewsPersonalizedInsight | None):
+    relevance_payload = relevance.to_dict() if relevance else None
     why_relevant = {
-        'matchedEntities': relevance.to_dict().get('matchedEntities', []) if relevance else [],
-        'reasonCodes': relevance.to_dict().get('reasonCodes', []) if relevance else [],
+        'matchedEntities': relevance_payload.get('matchedEntities', []) if relevance_payload else [],
+        'reasonCodes': relevance_payload.get('reasonCodes', []) if relevance_payload else [],
+        'matchedWatchlist': relevance_payload.get('matchedWatchlist', []) if relevance_payload else [],
     }
     return {
         'news': {
@@ -1151,7 +1287,7 @@ def to_news_feed_item(news: NewsCache, analysis: NewsAnalysis | None, relevance:
             'raw': json.loads(news.raw_json) if news.raw_json else {},
         },
         'globalAnalysis': get_global_analysis_payload(news.news_id, analysis) if analysis else None,
-        'relevance': relevance.to_dict() if relevance else None,
+        'relevance': relevance_payload,
         'personalizedInsight': insight.to_dict() if insight else None,
         'whyRelevant': why_relevant,
     }
@@ -2303,23 +2439,64 @@ def analyze_news_layer1(news_items: list[dict]) -> list[dict]:
         return _build_rule_based_layer1_results(news_items, background_context_by_news_id, 'ai_error')
 
 
+def _extract_stock_match_keys(stock: dict):
+    keys = set()
+    if not isinstance(stock, dict):
+        return keys
+    stock_name = (stock.get('name') or '').strip().lower()
+    stock_code = (stock.get('code') or '').strip()
+
+    if stock_name:
+        keys.add(stock_name)
+
+    if stock_code:
+        parsed = parse_stock_code_info(stock_code)
+        normalized = parsed['normalized_code'] if parsed else stock_code.strip().upper()
+        normalized_lower = normalized.lower()
+        keys.add(normalized_lower)
+        compact = re.sub(r'[^a-z0-9]', '', normalized_lower)
+        if compact:
+            keys.add(compact)
+        suffix_match = re.search(r'(\d{6})$', normalized_lower)
+        if suffix_match:
+            keys.add(suffix_match.group(1))
+
+    return keys
+
+
+def _safe_parse_array(value):
+    try:
+        parsed = json.loads(value) if value else []
+        return parsed if isinstance(parsed, list) else []
+    except json.JSONDecodeError:
+        return []
+
+
 def compute_user_relevance(news_analysis, user_id: int):
     """
-    Match a news analysis against a user's holdings.
+    Match a news analysis against a user's holdings/watchlist.
     Returns a UserNewsRelevance object or None if no relevance.
     """
-    user_keywords = get_user_keywords(user_id)
-    if not user_keywords:
+    holdings = FundHolding.query.filter_by(user_id=user_id).all()
+    watchlist = WatchlistItem.query.filter_by(user_id=user_id).all()
+
+    holding_keywords = set()
+    watchlist_keywords = set()
+    for fund in holdings:
+        holding_keywords.update(fund.keyword_set())
+    for item in watchlist:
+        watchlist_keywords.update(item.keyword_set())
+
+    if not holding_keywords and not watchlist_keywords:
         return None
 
-    analysis_stocks = json.loads(news_analysis.stocks) if news_analysis.stocks else []
-    analysis_sectors = json.loads(news_analysis.sectors) if news_analysis.sectors else []
+    analysis_stocks = _safe_parse_array(news_analysis.stocks)
+    analysis_sectors = _safe_parse_array(news_analysis.sectors)
 
-    # Also check the raw news content for keyword matches
     news = NewsCache.query.filter_by(news_id=news_analysis.news_id).first()
     news_text = ''
     if news:
-        news_text = ((news.title or '') + (news.content or '')).lower()
+        news_text = ((news.title or '') + (news.content or '') + (news.brief or '')).lower()
 
     matched_stocks = []
     matched_sectors = []
@@ -2327,49 +2504,164 @@ def compute_user_relevance(news_analysis, user_id: int):
     reason_codes = []
     score = 0.0
 
-    # Match extracted stocks against user keywords
+    holding_hit = False
+    watchlist_hit = False
+    holding_text_score = 0.0
+    watchlist_text_score = 0.0
+
+    matched_stock_keys = set()
+    matched_sector_keys = set()
+    entity_keys = set()
+
+    def append_entity(entity: dict):
+        key = (
+            entity.get('scope'),
+            entity.get('type'),
+            (entity.get('name') or '').strip(),
+            (entity.get('code') or '').strip(),
+        )
+        if key in entity_keys:
+            return
+        entity_keys.add(key)
+        matched_entities.append(entity)
+
     for stock in analysis_stocks:
-        stock_name = stock.get('name', '').lower()
-        stock_code = stock.get('code', '').lower()
-        if stock_name in user_keywords or stock_code in user_keywords:
-            matched_stocks.append(stock.get('name', ''))
-            matched_entities.append({
+        if not isinstance(stock, dict):
+            continue
+        match_keys = _extract_stock_match_keys(stock)
+        if not match_keys:
+            continue
+
+        stock_name = (stock.get('name') or stock.get('code') or '').strip()
+        stock_code = (stock.get('code') or '').strip().upper()
+        dedupe_key = stock_code or stock_name.lower()
+        if not dedupe_key:
+            continue
+
+        if match_keys & holding_keywords and ('holding', dedupe_key) not in matched_stock_keys:
+            matched_stock_keys.add(('holding', dedupe_key))
+            holding_hit = True
+            score += 0.30
+            reason_codes.append('HOLDING_STOCK_MATCH')
+            if stock_name:
+                matched_stocks.append(stock_name)
+            append_entity({
                 'type': 'stock',
-                'name': stock.get('name', ''),
-                'code': stock.get('code', ''),
-                'weight': 0.3,
+                'name': stock_name,
+                'code': stock_code,
+                'weight': 0.30,
+                'scope': 'holding',
             })
-            reason_codes.append('STOCK_MATCH')
-            score += 0.3
 
-    # Match extracted sectors against user keywords
+        if match_keys & watchlist_keywords and ('watchlist', dedupe_key) not in matched_stock_keys:
+            matched_stock_keys.add(('watchlist', dedupe_key))
+            watchlist_hit = True
+            score += 0.18
+            reason_codes.append('WATCHLIST_STOCK_MATCH')
+            if stock_name:
+                matched_stocks.append(stock_name)
+            append_entity({
+                'type': 'stock',
+                'name': stock_name,
+                'code': stock_code,
+                'weight': 0.18,
+                'scope': 'watchlist',
+            })
+
     for sector in analysis_sectors:
-        if sector.lower() in user_keywords:
-            matched_sectors.append(sector)
-            matched_entities.append({
-                'type': 'sector',
-                'name': sector,
-                'weight': 0.15,
-            })
-            reason_codes.append('SECTOR_MATCH')
+        if not isinstance(sector, str):
+            continue
+        sector_name = sector.strip()
+        if not sector_name:
+            continue
+        sector_key = sector_name.lower()
+        if sector_key in holding_keywords and ('holding', sector_key) not in matched_sector_keys:
+            matched_sector_keys.add(('holding', sector_key))
+            holding_hit = True
             score += 0.15
+            reason_codes.append('HOLDING_SECTOR_MATCH')
+            matched_sectors.append(sector_name)
+            append_entity({
+                'type': 'sector',
+                'name': sector_name,
+                'weight': 0.15,
+                'scope': 'holding',
+            })
 
-    # Fallback: keyword-in-text matching
-    for keyword in user_keywords:
-        if keyword and keyword in news_text:
-            if keyword not in [s.lower() for s in matched_stocks] and keyword not in [s.lower() for s in matched_sectors]:
-                score += 0.05
-                reason_codes.append('TEXT_MATCH')
+        if sector_key in watchlist_keywords and ('watchlist', sector_key) not in matched_sector_keys:
+            matched_sector_keys.add(('watchlist', sector_key))
+            watchlist_hit = True
+            score += 0.08
+            reason_codes.append('WATCHLIST_SECTOR_MATCH')
+            matched_sectors.append(sector_name)
+            append_entity({
+                'type': 'sector',
+                'name': sector_name,
+                'weight': 0.08,
+                'scope': 'watchlist',
+            })
+
+    for keyword in sorted(holding_keywords):
+        if not keyword or keyword not in news_text:
+            continue
+        if keyword in {item.lower() for item in matched_stocks if isinstance(item, str)}:
+            continue
+        if keyword in {item.lower() for item in matched_sectors if isinstance(item, str)}:
+            continue
+        delta = min(0.05, 0.20 - holding_text_score)
+        if delta <= 0:
+            break
+        holding_text_score += delta
+        holding_hit = True
+        score += delta
+        reason_codes.append('HOLDING_TEXT_MATCH')
+        append_entity({
+            'type': 'text',
+            'name': keyword,
+            'weight': round(delta, 3),
+            'scope': 'holding',
+        })
+
+    for keyword in sorted(watchlist_keywords):
+        if not keyword or keyword not in news_text:
+            continue
+        if keyword in {item.lower() for item in matched_stocks if isinstance(item, str)}:
+            continue
+        if keyword in {item.lower() for item in matched_sectors if isinstance(item, str)}:
+            continue
+        delta = min(0.03, 0.12 - watchlist_text_score)
+        if delta <= 0:
+            break
+        watchlist_text_score += delta
+        watchlist_hit = True
+        score += delta
+        reason_codes.append('WATCHLIST_TEXT_MATCH')
+        append_entity({
+            'type': 'text',
+            'name': keyword,
+            'weight': round(delta, 3),
+            'scope': 'watchlist',
+        })
 
     score = min(score, 1.0)
-
     if score <= 0:
         return None
 
-    # Impact level bonus
+    match_scope = 'none'
+    if holding_hit and watchlist_hit:
+        match_scope = 'mixed'
+    elif holding_hit:
+        match_scope = 'holding'
+    elif watchlist_hit:
+        match_scope = 'watchlist'
+
     if news_analysis.impact_level == 'major':
-        score = min(score * 1.5, 1.0)
-        reason_codes.append('MAJOR_IMPACT_BONUS')
+        if match_scope in {'holding', 'mixed'}:
+            score = min(score * 1.5, 1.0)
+            reason_codes.append('MAJOR_IMPACT_HOLDING_BONUS')
+        elif match_scope == 'watchlist':
+            score = min(score * 1.2, 1.0)
+            reason_codes.append('MAJOR_IMPACT_WATCHLIST_BONUS')
 
     score = round(score, 3)
     level = relevance_level_from_score(score)
@@ -2379,8 +2671,8 @@ def compute_user_relevance(news_analysis, user_id: int):
         news_id=news_analysis.news_id,
         relevance_score=score,
         relevance_level=level,
-        matched_stocks=json.dumps(matched_stocks, ensure_ascii=False),
-        matched_sectors=json.dumps(matched_sectors, ensure_ascii=False),
+        matched_stocks=json.dumps(sorted(set(matched_stocks)), ensure_ascii=False),
+        matched_sectors=json.dumps(sorted(set(matched_sectors)), ensure_ascii=False),
         matched_entities=json.dumps(matched_entities, ensure_ascii=False),
         reason_codes=json.dumps(sorted(set(reason_codes)), ensure_ascii=False),
         computed_at=datetime.utcnow(),
@@ -2404,7 +2696,7 @@ def build_personalized_insight(news: NewsCache, analysis: NewsAnalysis, relevanc
     elif analysis.sentiment == 'bearish' and relevance.relevance_score >= 0.55:
         action_bias = 'reduce'
 
-    default_summary = f'{analysis.summary or "该新闻"}与您的持仓存在相关性，建议结合盘中波动与仓位权重进一步判断。'
+    default_summary = f'{analysis.summary or "该新闻"}与您的关注资产存在相关性，建议结合盘中波动与仓位权重进一步判断。'
     default_risk = '若市场情绪快速反转，请优先控制仓位集中风险。'
     default_opportunity = '可将该新闻加入观察列表，结合后续公告与资金面信号再决策。'
     model_version = 'rules.v1'
@@ -2823,9 +3115,11 @@ def news_worker():
 
                         relevance = UserNewsRelevance.query.filter_by(user_id=config.user_id, news_id=news_id).first()
                         relevance_score = relevance.relevance_score if relevance else 0.0
-                        highlight = relevance_score > 0
+                        relevance_payload = relevance.to_dict() if relevance else {}
+                        match_scope = relevance_payload.get('matchScope', 'none')
+                        highlight = relevance_score > 0 and match_scope != 'none'
 
-                        if config.holdings_only and not highlight:
+                        if config.holdings_only and match_scope not in {'holding', 'mixed'}:
                             continue
 
                         should_notify = False
@@ -3354,9 +3648,21 @@ def create_fund():
     shares = max(0, float(data.get('shares') or 0))
     cost = max(0, float(data.get('cost') or 0))
 
-    existing = FundHolding.query.filter_by(user_id=g.current_user.id, code=holding['code']).first()
+    existing = find_holding_conflict(
+        user_id=g.current_user.id,
+        instrument_type=holding['instrument_type'],
+        code=holding['code'],
+    )
     if existing:
         return jsonify({'error': '该持仓代码已存在'}), 409
+
+    watch_conflict = find_watchlist_conflict(
+        user_id=g.current_user.id,
+        instrument_type=holding['instrument_type'],
+        code=holding['code'],
+    )
+    if watch_conflict:
+        return jsonify({'error': '该标的已在自选中，请先转持仓或删除自选'}), 409
 
     count = FundHolding.query.filter_by(user_id=g.current_user.id).count()
     fund = FundHolding(
@@ -3391,18 +3697,37 @@ def update_fund(fund_id):
         fund.cost = max(0, float(data['cost']))
     if 'sortOrder' in data:
         fund.sort_order = int(data['sortOrder'])
-    if 'code' in data and data['code']:
+    should_parse_asset = (
+        ('code' in data and data.get('code'))
+        or ('instrumentType' in data)
+        or ('instrument_type' in data)
+    )
+    if should_parse_asset:
+        payload = dict(data)
+        if not payload.get('code'):
+            payload['code'] = fund.code
+        if not payload.get('name'):
+            payload['name'] = fund.name
         try:
-            holding = parse_holding_payload(data, default_instrument_type=fund.instrument_type)
+            holding = parse_holding_payload(payload, default_instrument_type=fund.instrument_type)
         except ValueError as exc:
             return jsonify({'error': str(exc)}), 400
         if holding['code'] != fund.code or holding['instrument_type'] != normalize_instrument_type(fund.instrument_type):
-            duplicate = FundHolding.query.filter_by(
+            duplicate = find_holding_conflict(
                 user_id=g.current_user.id,
+                instrument_type=holding['instrument_type'],
                 code=holding['code'],
-            ).filter(FundHolding.id != fund.id).first()
+                exclude_fund_id=fund.id,
+            )
             if duplicate:
                 return jsonify({'error': '该持仓代码已存在'}), 409
+            watch_conflict = find_watchlist_conflict(
+                user_id=g.current_user.id,
+                instrument_type=holding['instrument_type'],
+                code=holding['code'],
+            )
+            if watch_conflict:
+                return jsonify({'error': '该标的已在自选中，请先转持仓或删除自选'}), 409
         fund.code = holding['code']
         fund.instrument_type = holding['instrument_type']
         fund.market = holding['market']
@@ -3482,6 +3807,7 @@ def import_funds():
             holding = parse_holding_payload(payload)
         except ValueError:
             continue
+        remove_watchlist_conflict(g.current_user.id, holding['instrument_type'], holding['code'])
         fund = FundHolding(
             user_id=g.current_user.id,
             instrument_type=holding['instrument_type'],
@@ -3527,6 +3853,176 @@ def export_funds():
         'version': '2.0',
     }
     return jsonify(payload)
+
+
+@app.get('/api/watchlist')
+@auth_required
+def list_watchlist():
+    items = (
+        WatchlistItem.query
+        .filter_by(user_id=g.current_user.id)
+        .order_by(WatchlistItem.sort_order.asc(), WatchlistItem.added_at.asc())
+        .all()
+    )
+    return jsonify({'items': [watchlist_to_dict(item) for item in items]})
+
+
+@app.post('/api/watchlist')
+@auth_required
+def create_watchlist_item():
+    data = request.get_json() or {}
+    try:
+        holding = parse_holding_payload(data)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    holding_conflict = find_holding_conflict(
+        user_id=g.current_user.id,
+        instrument_type=holding['instrument_type'],
+        code=holding['code'],
+    )
+    if holding_conflict:
+        return jsonify({'error': '该标的已在持仓中'}), 409
+
+    watchlist_conflict = find_watchlist_conflict(
+        user_id=g.current_user.id,
+        instrument_type=holding['instrument_type'],
+        code=holding['code'],
+    )
+    if watchlist_conflict:
+        return jsonify({'error': '该标的已在自选中'}), 409
+
+    sort_order = WatchlistItem.query.filter_by(user_id=g.current_user.id).count()
+    item = WatchlistItem(
+        user_id=g.current_user.id,
+        instrument_type=holding['instrument_type'],
+        market=holding['market'],
+        code=holding['code'],
+        name=holding['name'],
+        sort_order=sort_order,
+    )
+    db.session.add(item)
+    db.session.commit()
+    return jsonify({'item': watchlist_to_dict(item)})
+
+
+@app.put('/api/watchlist/<int:item_id>')
+@auth_required
+def update_watchlist_item(item_id):
+    item = WatchlistItem.query.filter_by(id=item_id, user_id=g.current_user.id).first()
+    if not item:
+        return jsonify({'error': '自选不存在'}), 404
+
+    data = request.get_json() or {}
+
+    should_parse_asset = (
+        ('code' in data and data.get('code'))
+        or ('instrumentType' in data)
+        or ('instrument_type' in data)
+    )
+    if should_parse_asset:
+        payload = dict(data)
+        if not payload.get('code'):
+            payload['code'] = item.code
+        if not payload.get('name'):
+            payload['name'] = item.name
+        try:
+            parsed = parse_holding_payload(payload, default_instrument_type=item.instrument_type)
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
+
+        changed = (
+            parsed['code'] != item.code
+            or parsed['instrument_type'] != normalize_instrument_type(item.instrument_type)
+        )
+        if changed:
+            holding_conflict = find_holding_conflict(
+                user_id=g.current_user.id,
+                instrument_type=parsed['instrument_type'],
+                code=parsed['code'],
+            )
+            if holding_conflict:
+                return jsonify({'error': '该标的已在持仓中'}), 409
+            watchlist_conflict = find_watchlist_conflict(
+                user_id=g.current_user.id,
+                instrument_type=parsed['instrument_type'],
+                code=parsed['code'],
+                exclude_item_id=item.id,
+            )
+            if watchlist_conflict:
+                return jsonify({'error': '该标的已在自选中'}), 409
+
+        item.instrument_type = parsed['instrument_type']
+        item.market = parsed['market']
+        item.code = parsed['code']
+
+    if 'name' in data:
+        item.name = (data.get('name') or '').strip() or item.code
+    if 'sortOrder' in data:
+        try:
+            item.sort_order = int(data.get('sortOrder') or 0)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'sortOrder 格式错误'}), 400
+
+    item.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'item': watchlist_to_dict(item)})
+
+
+@app.delete('/api/watchlist/<int:item_id>')
+@auth_required
+def delete_watchlist_item(item_id):
+    item = WatchlistItem.query.filter_by(id=item_id, user_id=g.current_user.id).first()
+    if not item:
+        return jsonify({'error': '自选不存在'}), 404
+    db.session.delete(item)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.post('/api/watchlist/<int:item_id>/convert')
+@auth_required
+def convert_watchlist_item(item_id):
+    item = WatchlistItem.query.filter_by(id=item_id, user_id=g.current_user.id).first()
+    if not item:
+        return jsonify({'error': '自选不存在'}), 404
+
+    data = request.get_json() or {}
+    shares = safe_float(data.get('shares'), -1)
+    cost = safe_float(data.get('cost'), -1)
+    if shares <= 0:
+        return jsonify({'error': '持有份额必须大于0'}), 400
+    if cost < 0:
+        return jsonify({'error': '持仓成本不能为负数'}), 400
+
+    instrument_type = normalize_instrument_type(item.instrument_type)
+    duplicate = find_holding_conflict(
+        user_id=g.current_user.id,
+        instrument_type=instrument_type,
+        code=item.code,
+    )
+    if duplicate:
+        return jsonify({'error': '该标的已在持仓中'}), 409
+
+    sort_order = FundHolding.query.filter_by(user_id=g.current_user.id).count()
+    fund = FundHolding(
+        user_id=g.current_user.id,
+        instrument_type=instrument_type,
+        market=item.market,
+        code=item.code,
+        name=item.name or item.code,
+        shares=shares,
+        cost=cost,
+        sort_order=sort_order,
+        added_at=datetime.utcnow(),
+    )
+    db.session.add(fund)
+    db.session.delete(item)
+    db.session.commit()
+
+    if instrument_type == 'fund':
+        enqueue_portfolio_refresh(g.current_user.id, fund.code)
+    return jsonify({'fund': fund_to_dict(fund)})
 
 
 @app.get('/api/webhook')

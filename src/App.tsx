@@ -6,11 +6,13 @@ import {
   IconLineChartStroked,
   IconPlusCircleStroked,
 } from '@douyinfe/semi-icons'
-import { useFunds } from '@/hooks'
+import { useFunds, useWatchlist } from '@/hooks'
 import { useAuth } from '@/context/AuthContext'
 import {
   AddFundForm,
+  AddWatchlistForm,
   FundTable,
+  WatchlistTable,
   NewsFeed,
   AdminConsole,
   AuthScreen,
@@ -188,7 +190,9 @@ function buildLocalOverview(
 function App() {
   const { user, token, loading: authLoading, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<string>('portfolio')
+  const [assetView, setAssetView] = useState<'holding' | 'watchlist'>('holding')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showAddWatchlistForm, setShowAddWatchlistForm] = useState(false)
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [dashboardOverview, setDashboardOverview] = useState<DashboardOverview | null>(null)
   const [dashboardPrefs, setDashboardPrefs] = useState<DashboardPreference>(DEFAULT_PREFS)
@@ -212,6 +216,16 @@ function App() {
     addTransaction,
     removeTransaction,
   } = useFunds(token, 60000)
+
+  const {
+    items: watchlistItems,
+    loading: watchlistLoading,
+    refresh: refreshWatchlist,
+    reload: reloadWatchlist,
+    addItem: addWatchlistItem,
+    removeItem: removeWatchlistItem,
+    convertToHolding,
+  } = useWatchlist(token, 60000)
 
   const loadDashboardOverview = useCallback(async () => {
     if (!token) return
@@ -255,11 +269,34 @@ function App() {
     setShowAddForm(false)
   }
 
+  const handleAddWatchlist = async (payload: { code: string; name?: string; instrumentType?: 'fund' | 'stock' }) => {
+    await addWatchlistItem(payload)
+    await reloadWatchlist()
+    await refreshWatchlist()
+    setShowAddWatchlistForm(false)
+    setAssetView('watchlist')
+  }
+
   const handleRemoveFund = async (fundId: number) => {
     const fund = funds.find((item) => item.id === fundId)
     if (fund && confirm(`确定要删除持仓 ${fund.name} (${fund.code}) 吗？`)) {
       await removeFund(fundId)
     }
+  }
+
+  const handleRemoveWatchlist = async (itemId: number) => {
+    const item = watchlistItems.find((entry) => entry.id === itemId)
+    if (item && confirm(`确定要删除自选 ${item.name} (${item.code}) 吗？`)) {
+      await removeWatchlistItem(itemId)
+    }
+  }
+
+  const handleConvertWatchlist = async (itemId: number, payload: { shares: number; cost: number }) => {
+    await convertToHolding(itemId, payload)
+    await reload()
+    await refresh()
+    await loadDashboardOverview()
+    setAssetView('holding')
   }
 
   const localOverview = useMemo(() => buildLocalOverview(funds, summary, lastUpdate), [funds, summary, lastUpdate])
@@ -292,6 +329,8 @@ function App() {
       return true
     })
   }, [funds, quickFilter, summary.totalValue])
+
+  const trackedAssetCount = funds.length + watchlistItems.length
 
   const syncPreference = async (payload: Partial<DashboardPreference>) => {
     if (!token) return
@@ -364,15 +403,20 @@ function App() {
       return (
         <ActionCenter
           token={token!}
+          assetCount={trackedAssetCount}
           fundCount={funds.length}
-          loading={loading}
+          loading={loading || watchlistLoading}
           lastUpdate={lastUpdate}
           recommendations={overview.recommendations}
           onAddFund={() => setShowAddForm(true)}
-          onRefresh={refresh}
+          onAddWatchlist={() => setShowAddWatchlistForm(true)}
+          onRefresh={async () => {
+            await Promise.all([refresh(), refreshWatchlist()])
+          }}
           onDataChange={async () => {
             await reload()
-            await refresh()
+            await reloadWatchlist()
+            await Promise.all([refresh(), refreshWatchlist()])
             await loadDashboardOverview()
           }}
         />
@@ -465,55 +509,105 @@ function App() {
               <div className="home-main-grid">
                 <section className="home-primary">
                   <Card>
-                    <div className="fund-filter-bar">
-                      <div className="fund-filter-chips">
-                        {[
-                          ['all', '全部持仓'],
-                          ['gainers', '今日上涨'],
-                          ['losers', '今日下跌'],
-                          ['heavy', '重仓风险'],
-                        ].map(([key, label]) => (
-                          <button
-                            key={key}
-                            className={`fund-filter-chip ${quickFilter === key ? 'active' : ''}`}
-                            onClick={() => setQuickFilter(key as QuickFilter)}
-                          >
-                            {label}
-                          </button>
-                        ))}
+                    <div className="asset-view-bar">
+                      <div className="asset-view-toggle">
+                        <button
+                          className={`asset-view-chip ${assetView === 'holding' ? 'active' : ''}`}
+                          onClick={() => setAssetView('holding')}
+                        >
+                          持仓
+                        </button>
+                        <button
+                          className={`asset-view-chip ${assetView === 'watchlist' ? 'active' : ''}`}
+                          onClick={() => setAssetView('watchlist')}
+                        >
+                          自选
+                        </button>
                       </div>
-                      <span style={{ fontSize: '12px', color: 'var(--semi-color-text-2)' }}>
-                        当前显示 {filteredFunds.length}/{funds.length}
-                      </span>
+                      {assetView === 'holding' ? (
+                        <span style={{ fontSize: '12px', color: 'var(--semi-color-text-2)' }}>
+                          当前显示 {filteredFunds.length}/{funds.length}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: 'var(--semi-color-text-2)' }}>
+                          当前显示 {watchlistItems.length} 条自选
+                        </span>
+                      )}
                     </div>
+
+                    {assetView === 'holding' && (
+                      <div className="fund-filter-bar">
+                        <div className="fund-filter-chips">
+                          {[
+                            ['all', '全部持仓'],
+                            ['gainers', '今日上涨'],
+                            ['losers', '今日下跌'],
+                            ['heavy', '重仓风险'],
+                          ].map(([key, label]) => (
+                            <button
+                              key={key}
+                              className={`fund-filter-chip ${quickFilter === key ? 'active' : ''}`}
+                              onClick={() => setQuickFilter(key as QuickFilter)}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </Card>
 
-                  {funds.length === 0 ? (
-                    <Card className="home-empty-card">
-                      <div className="home-empty-content">
-                        <div className="home-empty-icon">
-                          <IconPlusCircleStroked size="extra-large" />
+                  {assetView === 'holding' ? (
+                    funds.length === 0 ? (
+                      <Card className="home-empty-card">
+                        <div className="home-empty-content">
+                          <div className="home-empty-icon">
+                            <IconPlusCircleStroked size="extra-large" />
+                          </div>
+                          <h3>空仓待命</h3>
+                          <p>先添加 1-2 只核心持仓，启动您的盘中决策工作台</p>
+                          <Button theme="solid" style={{ marginTop: '16px' }} onClick={() => setShowAddForm(true)}>
+                            添加第一条持仓
+                          </Button>
                         </div>
-                        <h3>空仓待命</h3>
-                        <p>先添加 1-2 只核心持仓，启动您的盘中决策工作台</p>
-                        <Button theme="solid" style={{ marginTop: '16px' }} onClick={() => setShowAddForm(true)}>
-                          添加第一条持仓
-                        </Button>
+                      </Card>
+                    ) : (
+                      <div className="fund-table-shell">
+                        <FundTable
+                          funds={filteredFunds}
+                          intradayData={intradayData}
+                          initialSort={tableSort}
+                          onSortChange={handleTableSortChange}
+                          onRemove={handleRemoveFund}
+                          onTransaction={addTransaction}
+                          onDeleteTransaction={removeTransaction}
+                          onEdit={updateFund}
+                        />
                       </div>
-                    </Card>
+                    )
                   ) : (
-                    <div className="fund-table-shell">
-                      <FundTable
-                        funds={filteredFunds}
-                        intradayData={intradayData}
-                        initialSort={tableSort}
-                        onSortChange={handleTableSortChange}
-                        onRemove={handleRemoveFund}
-                        onTransaction={addTransaction}
-                        onDeleteTransaction={removeTransaction}
-                        onEdit={updateFund}
-                      />
-                    </div>
+                    watchlistItems.length === 0 ? (
+                      <Card className="home-empty-card">
+                        <div className="home-empty-content">
+                          <div className="home-empty-icon">
+                            <IconPlusCircleStroked size="extra-large" />
+                          </div>
+                          <h3>暂无自选</h3>
+                          <p>把关注的基金或股票先加入自选，合适时再一键建仓</p>
+                          <Button theme="solid" style={{ marginTop: '16px' }} onClick={() => setShowAddWatchlistForm(true)}>
+                            添加第一条自选
+                          </Button>
+                        </div>
+                      </Card>
+                    ) : (
+                      <div className="fund-table-shell">
+                        <WatchlistTable
+                          items={watchlistItems}
+                          onRemove={handleRemoveWatchlist}
+                          onConvert={handleConvertWatchlist}
+                        />
+                      </div>
+                    )
                   )}
                 </section>
 
@@ -550,6 +644,9 @@ function App() {
 
       {showAddForm && (
         <AddFundForm onAdd={handleAddFund} onCancel={() => setShowAddForm(false)} />
+      )}
+      {showAddWatchlistForm && (
+        <AddWatchlistForm onAdd={handleAddWatchlist} onCancel={() => setShowAddWatchlistForm(false)} />
       )}
     </div>
   )

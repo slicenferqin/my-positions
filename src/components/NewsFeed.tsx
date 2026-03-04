@@ -50,6 +50,20 @@ const DEFAULT_WEBHOOK_CONFIG: WebhookConfigState = {
   cooldownSec: 300,
 }
 
+function relevanceScopeMeta(scope: string | undefined, score: number) {
+  const normalized = (scope || '').toLowerCase()
+  if (normalized === 'mixed') {
+    return { label: '持仓+自选相关', color: 'orange' as const }
+  }
+  if (normalized === 'watchlist') {
+    return { label: '自选相关', color: 'blue' as const }
+  }
+  if (normalized === 'holding' || score > 0) {
+    return { label: '持仓相关', color: 'red' as const }
+  }
+  return null
+}
+
 export function NewsFeed({ funds = [] }: NewsFeedProps) {
   const { token } = useAuth()
   const [mode, setMode] = useState<'all' | 'relevant'>('all')
@@ -369,7 +383,9 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
             <div className="news-list">
               {filteredNews.map((item) => {
                 const relevanceScore = item.relevance?.relevanceScore || 0
-                const matchedEntities = (item.whyRelevant?.matchedEntities || []).filter((target) => target.type !== 'stock')
+                const scopeMeta = relevanceScopeMeta(item.relevance?.matchScope, relevanceScore)
+                const matchedEntities = (item.whyRelevant?.matchedEntities || []).filter((target) => target.type === 'sector')
+                const matchedWatchlist = item.relevance?.matchedWatchlist || item.whyRelevant?.matchedWatchlist || []
                 const feedbackAction = feedbackMap[item.news.id]
 
                 return (
@@ -380,7 +396,7 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
                           {new Date(item.news.ctime * 1000).toLocaleString('zh-CN')}
                         </span>
                         <Tag size="small" type="ghost">财联社</Tag>
-                        {relevanceScore > 0 && <Tag color="red" size="small">持仓相关</Tag>}
+                        {scopeMeta && <Tag color={scopeMeta.color} size="small">{scopeMeta.label}</Tag>}
                       </div>
                     </div>
 
@@ -403,9 +419,14 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
                                 ))
                               : (
                                 <Tag size="small" type="light">
-                                  与持仓板块关联
+                                  与关注资产存在关联
                                 </Tag>
                               )}
+                            {matchedWatchlist.slice(0, 3).map((name, index) => (
+                              <Tag key={`watchlist-${name}-${index}`} size="small" color="blue" type="light">
+                                自选命中: {name}
+                              </Tag>
+                            ))}
                           </Space>
                         </div>
                       </div>
@@ -478,7 +499,7 @@ export function NewsFeed({ funds = [] }: NewsFeedProps) {
                 <strong className="news-metric-value">{filteredNews.length}</strong>
               </div>
               <div className="news-metric">
-                <span className="news-metric-label">持仓相关</span>
+                <span className="news-metric-label">相关情报</span>
                 <strong className="news-metric-value">{relevantCount}</strong>
               </div>
               <div className="news-metric">

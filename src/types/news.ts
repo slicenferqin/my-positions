@@ -52,7 +52,10 @@ export interface UserNewsRelevanceV2 {
     name: string
     code?: string
     weight?: number
+    scope?: 'holding' | 'watchlist' | string
   }>
+  matchScope?: 'holding' | 'watchlist' | 'mixed' | 'none' | string
+  matchedWatchlist?: string[]
   reasonCodes: string[]
   personalizedComment?: string | null
   computedAt?: number | null
@@ -83,6 +86,7 @@ export interface NewsFeedItemV2 {
   personalizedInsight: UserNewsPersonalizedInsight | null
   whyRelevant: {
     matchedEntities: UserNewsRelevanceV2['matchedEntities']
+    matchedWatchlist?: string[]
     reasonCodes: string[]
   }
 }

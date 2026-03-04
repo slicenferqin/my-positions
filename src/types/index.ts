@@ -44,5 +44,6 @@ export type {
   DashboardMover,
   MarketPulseItem,
 } from './dashboard'
+export type { WatchlistItem, WatchlistWithEstimation } from './watchlist'
 
 export { STORAGE_KEYS, DEFAULT_WEBHOOK_CONFIG } from './storage'

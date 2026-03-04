@@ -1,4 +1,4 @@
-import type { Transaction, UserFund, WebhookConfig } from '@/types'
+import type { Transaction, UserFund, WatchlistItem, WebhookConfig } from '@/types'
 import type { AuthUser } from '@/types/auth'
 import type { DashboardOverview, DashboardPreference } from '@/types/dashboard'
 import type {
@@ -138,6 +138,53 @@ export function refreshPortfolioRequest(token: string, code?: string) {
     method: 'POST',
     token,
     body: code ? { code } : {},
+  })
+}
+
+// Watchlist
+export function fetchWatchlist(token: string): Promise<{ items: WatchlistItem[] }> {
+  return apiRequest<{ items: WatchlistItem[] }>(`${API_BASE}/watchlist`, { token })
+}
+
+export function createWatchlistItem(
+  token: string,
+  payload: { instrumentType?: 'fund' | 'stock'; code: string; name?: string }
+) {
+  return apiRequest<{ item: WatchlistItem }>(`${API_BASE}/watchlist`, {
+    method: 'POST',
+    token,
+    body: payload,
+  })
+}
+
+export function updateWatchlistItem(
+  token: string,
+  itemId: number,
+  payload: Partial<Pick<WatchlistItem, 'name' | 'sortOrder' | 'code' | 'instrumentType' | 'market'>>
+) {
+  return apiRequest<{ item: WatchlistItem }>(`${API_BASE}/watchlist/${itemId}`, {
+    method: 'PUT',
+    token,
+    body: payload,
+  })
+}
+
+export function deleteWatchlistItem(token: string, itemId: number) {
+  return apiRequest<{ success: boolean }>(`${API_BASE}/watchlist/${itemId}`, {
+    method: 'DELETE',
+    token,
+  })
+}
+
+export function convertWatchlistToFund(
+  token: string,
+  itemId: number,
+  payload: { shares: number; cost: number }
+) {
+  return apiRequest<{ fund: UserFund }>(`${API_BASE}/watchlist/${itemId}/convert`, {
+    method: 'POST',
+    token,
+    body: payload,
   })
 }
 

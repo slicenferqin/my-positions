@@ -103,6 +103,38 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.asset-view-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.asset-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.asset-view-chip {
+  border: 1px solid var(--semi-color-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--semi-color-text-1);
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.asset-view-chip.active {
+  border-color: var(--semi-color-primary);
+  color: var(--semi-color-primary);
+  background: var(--semi-color-primary-light-default);
 }
 
 .fund-filter-chips {
@@ -197,6 +229,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.action-center-row-single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .action-center-tips {
@@ -362,5 +398,18 @@
 
   .action-center-row {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .asset-view-bar {
+    align-items: stretch;
+  }
+
+  .asset-view-toggle {
+    width: 100%;
+  }
+
+  .asset-view-chip {
+    flex: 1;
+    text-align: center;
   }
 }

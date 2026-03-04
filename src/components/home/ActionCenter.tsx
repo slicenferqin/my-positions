@@ -1,27 +1,31 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import { Card, Button, Space, Toast } from '@douyinfe/semi-ui'
+import { Card, Button, Toast } from '@douyinfe/semi-ui'
 import { IconPlus, IconRefresh, IconDownload, IconUpload } from '@douyinfe/semi-icons'
 import { exportFundsRequest, importFundsRequest } from '@/services/api'
 import './HomeDashboard.css'
 
 interface ActionCenterProps {
   token: string
+  assetCount: number
   fundCount: number
   loading: boolean
   lastUpdate: Date | null
   recommendations: string[]
   onAddFund: () => void
+  onAddWatchlist: () => void
   onRefresh: () => Promise<void> | void
   onDataChange: () => Promise<void> | void
 }
 
 export function ActionCenter({
   token,
+  assetCount,
   fundCount,
   loading,
   lastUpdate,
   recommendations,
   onAddFund,
+  onAddWatchlist,
   onRefresh,
   onDataChange,
 }: ActionCenterProps) {
@@ -79,14 +83,19 @@ export function ActionCenter({
           <Button theme="solid" icon={<IconPlus />} onClick={onAddFund}>
             添加持仓
           </Button>
-          <Button icon={<IconRefresh />} onClick={() => onRefresh()} loading={loading} disabled={syncing || fundCount === 0}>
-            刷新估值
+          <Button icon={<IconPlus />} onClick={onAddWatchlist}>
+            添加自选
           </Button>
         </div>
         <div className="action-center-row">
+          <Button icon={<IconRefresh />} onClick={() => onRefresh()} loading={loading} disabled={syncing || assetCount === 0}>
+            刷新估值
+          </Button>
           <Button icon={<IconUpload />} onClick={() => fileInputRef.current?.click()} disabled={syncing}>
             导入持仓
           </Button>
+        </div>
+        <div className="action-center-row action-center-row-single">
           <Button icon={<IconDownload />} onClick={handleExport} disabled={syncing || fundCount === 0}>
             导出快照
           </Button>
@@ -103,12 +112,13 @@ export function ActionCenter({
 
       <div className="action-center-tips">
         <div>1) 先看异常再操作，避免情绪化调仓</div>
+        <div>2) 自选不计入盈亏与风险，适合先观察后建仓</div>
         {recommendations.length > 0 ? (
           recommendations.slice(0, 2).map((item, index) => (
-            <div key={`${index}-${item}`}>{index + 2}) {item}</div>
+            <div key={`${index}-${item}`}>{index + 3}) {item}</div>
           ))
         ) : (
-          <div>2) 当前无高优先级风险，建议按计划执行</div>
+          <div>3) 当前无高优先级风险，建议按计划执行</div>
         )}
       </div>
     </Card>

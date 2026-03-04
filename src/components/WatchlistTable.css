@@ -1,0 +1,218 @@
+.watchlist-table-container {
+  background: var(--bg-card);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.watchlist-table-desktop {
+  display: block;
+}
+
+.watchlist-mobile-list {
+  display: none;
+}
+
+.watchlist-table-scroll {
+  overflow-x: auto;
+}
+
+.watchlist-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+
+.watchlist-table th {
+  background: var(--bg-primary);
+  padding: 14px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.watchlist-table th.col-nav,
+.watchlist-table td.col-nav,
+.watchlist-table th.col-time,
+.watchlist-table td.col-time {
+  text-align: right;
+}
+
+.watchlist-table th.col-actions,
+.watchlist-table td.col-actions {
+  text-align: center;
+}
+
+.watchlist-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.watchlist-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.watchlist-table tbody tr.loading {
+  opacity: 0.66;
+}
+
+.watchlist-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.watchlist-name-cell .name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.watchlist-name-cell .code {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+}
+
+.watchlist-name-cell .code em {
+  font-style: normal;
+  font-family: var(--semi-font-family);
+  font-size: 11px;
+  color: var(--semi-color-text-2);
+  border: 1px solid var(--semi-color-border);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.watchlist-price-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.watchlist-price {
+  font-family: 'SF Mono', 'Roboto Mono', monospace;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.watchlist-change {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.watchlist-price-cell.rise .watchlist-change,
+.watchlist-mobile-price.rise .watchlist-change {
+  color: var(--rise-color);
+  background: var(--rise-bg);
+}
+
+.watchlist-price-cell.fall .watchlist-change,
+.watchlist-mobile-price.fall .watchlist-change {
+  color: var(--fall-color);
+  background: var(--fall-bg);
+}
+
+.watchlist-price-cell.flat .watchlist-change,
+.watchlist-mobile-price.flat .watchlist-change {
+  color: var(--text-secondary);
+  background: var(--semi-color-fill-1);
+}
+
+.watchlist-price-empty {
+  color: var(--semi-color-text-2);
+  font-size: 12px;
+}
+
+.watchlist-convert-form {
+  display: grid;
+  gap: 12px;
+}
+
+.watchlist-convert-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.watchlist-convert-form label span {
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.watchlist-convert-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+@media (max-width: 900px) {
+  .watchlist-table-container {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .watchlist-table-desktop {
+    display: none;
+  }
+
+  .watchlist-mobile-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .watchlist-mobile-card {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-card);
+    padding: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .watchlist-mobile-card.loading {
+    opacity: 0.66;
+  }
+
+  .watchlist-mobile-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .watchlist-mobile-price {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .watchlist-mobile-footer {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .watchlist-update-time {
+    font-size: 12px;
+    color: var(--semi-color-text-2);
+  }
+
+  .watchlist-mobile-actions .semi-space {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

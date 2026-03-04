@@ -94,7 +94,7 @@ export function NewsAnalysisCard({ analysis, relevance }: NewsAnalysisCardProps)
       {relevance && relevance.relevanceScore > 0 && (
         <div className="news-analysis-relevance">
           <div className="news-analysis-relevance-head">
-            <span>与持仓相关度</span>
+            <span>与我相关度</span>
             <strong>{Math.round(relevance.relevanceScore * 100)}%</strong>
           </div>
           <Progress
