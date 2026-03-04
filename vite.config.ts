@@ -23,7 +23,7 @@ function createProxyConfig(): Record<string, string | ProxyOptions> {
     }
   }
 
-  const backendRoutes = ['/api/ai', '/api/auth', '/api/funds', '/api/news', '/api/webhook', '/api/portfolio', '/api/dashboard']
+  const backendRoutes = ['/api/ai', '/api/auth', '/api/funds', '/api/watchlist', '/api/news', '/api/webhook', '/api/portfolio', '/api/dashboard']
   for (const route of backendRoutes) {
     addProxy(route, {
       target: 'http://127.0.0.1:5001',
