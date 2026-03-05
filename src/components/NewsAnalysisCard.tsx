@@ -15,6 +15,10 @@ export function NewsAnalysisCard({ analysis, relevance }: NewsAnalysisCardProps)
     analysis.sectorImpacts?.length > 0
       ? analysis.sectorImpacts
       : analysis.sectors.map((sector) => ({ sector, polarity: analysis.sentiment }))
+  const watchPoints = (analysis.watchPoints || []).filter((item) => typeof item === 'string' && item.trim())
+  const sourceLinks = (analysis.backgroundSources || [])
+    .filter((item) => typeof item === 'string' && item.trim())
+    .slice(0, 2)
 
   const getSentimentColor = (sentiment: string) => {
     switch (sentiment) {
@@ -129,6 +133,24 @@ export function NewsAnalysisCard({ analysis, relevance }: NewsAnalysisCardProps)
             </div>
           )}
 
+          {analysis.impactAnalysis && (
+            <div className="news-analysis-block">
+              <div className="news-analysis-label">影响分析</div>
+              <div className="news-analysis-text">{analysis.impactAnalysis}</div>
+            </div>
+          )}
+
+          {watchPoints.length > 0 && (
+            <div className="news-analysis-block">
+              <div className="news-analysis-label">观察要点</div>
+              <ul className="news-analysis-watch-list">
+                {watchPoints.map((point, index) => (
+                  <li key={`${point}-${index}`}>{point}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {sectorImpacts.length > 0 && (
             <div className="news-analysis-block">
               <div className="news-analysis-label">板块影响</div>
@@ -139,6 +161,19 @@ export function NewsAnalysisCard({ analysis, relevance }: NewsAnalysisCardProps)
                   </Tag>
                 ))}
               </Space>
+            </div>
+          )}
+
+          {sourceLinks.length > 0 && (
+            <div className="news-analysis-block">
+              <div className="news-analysis-label">参考来源</div>
+              <div className="news-analysis-links">
+                {sourceLinks.map((url) => (
+                  <a key={url} href={url} target="_blank" rel="noreferrer">
+                    {url}
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 

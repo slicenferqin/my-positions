@@ -1,0 +1,26 @@
+.modal-action-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 12px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  border-top: 1px solid rgba(31, 35, 41, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--semi-color-bg-2) 48%);
+}
+
+.modal-action-bar.compact {
+  margin-top: 14px;
+}
+
+@media (max-width: 768px) {
+  .modal-action-bar {
+    gap: 8px;
+    margin-top: 18px;
+    padding-top: 10px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  }
+}

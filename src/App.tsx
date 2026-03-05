@@ -191,8 +191,7 @@ function App() {
   const { user, token, loading: authLoading, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<string>('portfolio')
   const [assetView, setAssetView] = useState<'holding' | 'watchlist'>('holding')
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [showAddWatchlistForm, setShowAddWatchlistForm] = useState(false)
+  const [assetModal, setAssetModal] = useState<'none' | 'holding' | 'watchlist'>('none')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [dashboardOverview, setDashboardOverview] = useState<DashboardOverview | null>(null)
   const [dashboardPrefs, setDashboardPrefs] = useState<DashboardPreference>(DEFAULT_PREFS)
@@ -264,16 +263,34 @@ function App() {
     }
   }, [activeTab, token, funds.length, lastUpdate?.getTime(), loadDashboardOverview])
 
+  const openAddFundModal = useCallback(() => {
+    setAssetModal('holding')
+  }, [])
+
+  const openAddWatchlistModal = useCallback(() => {
+    setAssetModal('watchlist')
+  }, [])
+
+  const closeAssetModal = useCallback(() => {
+    setAssetModal('none')
+  }, [])
+
+  useEffect(() => {
+    if (activeTab !== 'portfolio') {
+      setAssetModal('none')
+    }
+  }, [activeTab])
+
   const handleAddFund = async (fund: { code: string; name?: string; shares: number; cost: number; instrumentType?: 'fund' | 'stock' }) => {
     await addFund(fund)
-    setShowAddForm(false)
+    setAssetModal('none')
   }
 
   const handleAddWatchlist = async (payload: { code: string; name?: string; instrumentType?: 'fund' | 'stock' }) => {
     await addWatchlistItem(payload)
     await reloadWatchlist()
     await refreshWatchlist()
-    setShowAddWatchlistForm(false)
+    setAssetModal('none')
     setAssetView('watchlist')
   }
 
@@ -408,8 +425,8 @@ function App() {
           loading={loading || watchlistLoading}
           lastUpdate={lastUpdate}
           recommendations={overview.recommendations}
-          onAddFund={() => setShowAddForm(true)}
-          onAddWatchlist={() => setShowAddWatchlistForm(true)}
+          onAddFund={openAddFundModal}
+          onAddWatchlist={openAddWatchlistModal}
           onRefresh={async () => {
             await Promise.all([refresh(), refreshWatchlist()])
           }}
@@ -566,7 +583,7 @@ function App() {
                           </div>
                           <h3>空仓待命</h3>
                           <p>先添加 1-2 只核心持仓，启动您的盘中决策工作台</p>
-                          <Button theme="solid" style={{ marginTop: '16px' }} onClick={() => setShowAddForm(true)}>
+                          <Button theme="solid" style={{ marginTop: '16px' }} onClick={openAddFundModal}>
                             添加第一条持仓
                           </Button>
                         </div>
@@ -594,7 +611,7 @@ function App() {
                           </div>
                           <h3>暂无自选</h3>
                           <p>把关注的基金或股票先加入自选，合适时再一键建仓</p>
-                          <Button theme="solid" style={{ marginTop: '16px' }} onClick={() => setShowAddWatchlistForm(true)}>
+                          <Button theme="solid" style={{ marginTop: '16px' }} onClick={openAddWatchlistModal}>
                             添加第一条自选
                           </Button>
                         </div>
@@ -642,11 +659,11 @@ function App() {
         </div>
       </main>
 
-      {showAddForm && (
-        <AddFundForm onAdd={handleAddFund} onCancel={() => setShowAddForm(false)} />
+      {assetModal === 'holding' && (
+        <AddFundForm onAdd={handleAddFund} onCancel={closeAssetModal} />
       )}
-      {showAddWatchlistForm && (
-        <AddWatchlistForm onAdd={handleAddWatchlist} onCancel={() => setShowAddWatchlistForm(false)} />
+      {assetModal === 'watchlist' && (
+        <AddWatchlistForm onAdd={handleAddWatchlist} onCancel={closeAssetModal} />
       )}
     </div>
   )

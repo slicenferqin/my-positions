@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Modal, InputNumber, Radio, RadioGroup, Toast } from '@douyinfe/semi-ui'
+import { Modal, InputNumber, Radio, RadioGroup, Toast, Button } from '@douyinfe/semi-ui'
 import type { FundWithEstimation } from '@/types'
 import { formatMoney } from '@/services'
+import './ModalActionBar.css'
 
 interface EditFundFormProps {
   fund: FundWithEstimation
@@ -53,10 +54,11 @@ export function EditFundForm({ fund, onSave, onCancel }: EditFundFormProps) {
       }
       visible={true}
       onCancel={onCancel}
-      onOk={handleSubmit}
-      okText="保存"
-      cancelText="取消"
-      width={480}
+      footer={null}
+      motion={false}
+      width="min(480px, calc(100vw - 24px))"
+      centered
+      bodyStyle={{ maxHeight: '74vh', overflowY: 'auto' }}
     >
       <div style={{ display: 'grid', gap: '12px' }}>
         <label style={{ display: 'grid', gap: '6px' }}>
@@ -125,6 +127,11 @@ export function EditFundForm({ fund, onSave, onCancel }: EditFundFormProps) {
               </span>
             </div>
           )}
+        </div>
+
+        <div className="modal-action-bar">
+          <Button onClick={onCancel}>取消</Button>
+          <Button theme="solid" onClick={handleSubmit}>保存</Button>
         </div>
       </div>
     </Modal>

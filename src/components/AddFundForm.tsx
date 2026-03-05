@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Modal, Form, Toast, RadioGroup, Radio } from '@douyinfe/semi-ui'
+import './ModalActionBar.css'
 
 interface AddFundFormProps {
   onAdd: (fund: { code: string; name?: string; shares: number; cost: number; instrumentType?: 'fund' | 'stock' }) => Promise<void>
@@ -53,7 +54,10 @@ export function AddFundForm({ onAdd, onCancel }: AddFundFormProps) {
       getPopupContainer={() => document.body}
       zIndex={2200}
       footer={null}
-      width={480}
+      motion={false}
+      width="min(480px, calc(100vw - 24px))"
+      centered
+      bodyStyle={{ maxHeight: '72vh', overflowY: 'auto', paddingBottom: '14px' }}
     >
       <div style={{ marginBottom: '16px' }}>
         <RadioGroup
@@ -104,7 +108,7 @@ export function AddFundForm({ onAdd, onCancel }: AddFundFormProps) {
           precision={2}
         />
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
+        <div className="modal-action-bar">
           <button
             type="button"
             onClick={onCancel}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Modal, Form, Toast, RadioGroup, Radio } from '@douyinfe/semi-ui'
+import './ModalActionBar.css'
 
 interface AddWatchlistFormProps {
   onAdd: (payload: { code: string; name?: string; instrumentType?: 'fund' | 'stock' }) => Promise<void>
@@ -43,7 +44,10 @@ export function AddWatchlistForm({ onAdd, onCancel }: AddWatchlistFormProps) {
       getPopupContainer={() => document.body}
       zIndex={2200}
       footer={null}
-      width={460}
+      motion={false}
+      width="min(460px, calc(100vw - 24px))"
+      centered
+      bodyStyle={{ maxHeight: '72vh', overflowY: 'auto', paddingBottom: '14px' }}
     >
       <div style={{ marginBottom: '16px' }}>
         <RadioGroup
@@ -78,7 +82,7 @@ export function AddWatchlistForm({ onAdd, onCancel }: AddWatchlistFormProps) {
           placeholder="留空将默认使用代码"
         />
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '24px' }}>
+        <div className="modal-action-bar">
           <button
             type="button"
             onClick={onCancel}

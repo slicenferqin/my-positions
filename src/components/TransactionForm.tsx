@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal, Tabs, Radio, RadioGroup, Button, Toast, List, Input, InputNumber, DatePicker } from '@douyinfe/semi-ui'
 import type { FundWithEstimation, Transaction, TransactionType } from '@/types'
 import { parseEstimation, formatMoney } from '@/services'
+import './ModalActionBar.css'
 
 interface TransactionFormProps {
   fund: FundWithEstimation
@@ -68,7 +69,10 @@ export function TransactionForm({ fund, onSubmit, onCancel, onDeleteTransaction 
       visible={true}
       onCancel={onCancel}
       footer={null}
-      width={560}
+      motion={false}
+      width="min(560px, calc(100vw - 20px))"
+      centered
+      bodyStyle={{ maxHeight: '76vh', overflowY: 'auto' }}
     >
       <Tabs activeKey={activeTab} onChange={setActiveTab}>
         <Tabs.TabPane tab="新增记录" itemKey="form">
@@ -164,7 +168,7 @@ export function TransactionForm({ fund, onSubmit, onCancel, onDeleteTransaction 
               <span style={{ fontWeight: 600, fontSize: '16px' }}>¥{formatMoney(amount)}</span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <div className="modal-action-bar">
               <Button onClick={onCancel}>取消</Button>
               <Button theme="solid" onClick={handleSubmit}>确认调仓</Button>
             </div>

@@ -33,6 +33,9 @@ export interface GlobalNewsAnalysis {
   impactLevel: 'major' | 'moderate' | 'minor'
   summary: string
   background: string
+  backgroundSources?: string[]
+  impactAnalysis?: string
+  watchPoints?: string[]
   tags: string[]
   modelUsed: string
   analyzedAt: number | null

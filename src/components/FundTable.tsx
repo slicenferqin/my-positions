@@ -41,7 +41,7 @@ export function FundTable({
 }: FundTableProps) {
   const [expandedFundId, setExpandedFundId] = useState<number | null>(null)
   const [transactionFundId, setTransactionFundId] = useState<number | null>(null)
-  const [editingFund, setEditingFund] = useState<FundWithEstimation | null>(null)
+  const [editingFundId, setEditingFundId] = useState<number | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>(initialSort?.key ?? null)
   const [sortDirection, setSortDirection] = useState<SortDirection>(initialSort?.direction ?? 'desc')
 
@@ -55,6 +55,10 @@ export function FundTable({
   const transactionFund = useMemo(() => {
     return funds.find(f => f.id === transactionFundId) || null
   }, [funds, transactionFundId])
+
+  const editingFund = useMemo(() => {
+    return funds.find(f => f.id === editingFundId) || null
+  }, [funds, editingFundId])
 
   // 计算每个基金的排序数值
   const getFundValues = (fund: FundWithEstimation) => {
@@ -136,9 +140,11 @@ export function FundTable({
         className="btn-icon btn-edit"
         onClick={(e) => {
           e.stopPropagation()
-          setEditingFund(fund)
+          setTransactionFundId(null)
+          setEditingFundId(fund.id ?? null)
         }}
         title="编辑"
+        disabled={!fund.id}
       >
         <IconEditStroked />
       </button>
@@ -146,9 +152,11 @@ export function FundTable({
         className="btn-icon btn-trade"
         onClick={(e) => {
           e.stopPropagation()
+          setEditingFundId(null)
           setTransactionFundId(fund.id ?? null)
         }}
         title="调仓"
+        disabled={!fund.id}
       >
         <IconMoneyExchangeStroked />
       </button>
@@ -352,9 +360,9 @@ export function FundTable({
           fund={editingFund}
           onSave={async (id, updates) => {
             await onEdit(id, updates)
-            setEditingFund(null)
+            setEditingFundId(null)
           }}
-          onCancel={() => setEditingFund(null)}
+          onCancel={() => setEditingFundId(null)}
         />
       )}
     </div>

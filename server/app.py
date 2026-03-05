@@ -19,6 +19,22 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 from sqlalchemy import inspect, text, and_, or_
+from sqlalchemy.exc import IntegrityError
+
+try:
+    from duckduckgo_search import DDGS
+except ImportError:
+    DDGS = None
+
+try:
+    import trafilatura
+except ImportError:
+    trafilatura = None
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 
 load_dotenv()
@@ -26,7 +42,9 @@ load_dotenv()
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///mypositions.db')
 JWT_SECRET = os.getenv('JWT_SECRET', 'replace-this-secret')
 JWT_EXPIRES_DAYS = int(os.getenv('JWT_EXPIRES_DAYS', '15'))
-NEWS_POLL_SECONDS = int(os.getenv('NEWS_POLL_SECONDS', '60'))
+NEWS_POLL_SECONDS = int(os.getenv('NEWS_POLL_SECONDS', '20'))
+NEWS_MIN_COOLDOWN_SECONDS = int(os.getenv('NEWS_MIN_COOLDOWN_SECONDS', '15'))
+NEWS_PUSH_MAX_AGE_SECONDS = int(os.getenv('NEWS_PUSH_MAX_AGE_SECONDS', '900'))
 ADMIN_EMAILS = {
     email.strip().lower()
     for email in os.getenv('ADMIN_EMAILS', '').split(',')
@@ -42,6 +60,13 @@ METASO_QUOTA_COOLDOWN_SECONDS = int(os.getenv('METASO_QUOTA_COOLDOWN_SECONDS', '
 METASO_READER_MIN_SNIPPET = int(os.getenv('METASO_READER_MIN_SNIPPET', '80'))
 METASO_CONTEXT_CACHE_TTL_SECONDS = int(os.getenv('METASO_CONTEXT_CACHE_TTL_SECONDS', '43200'))
 METASO_EMPTY_CONTEXT_TTL_SECONDS = int(os.getenv('METASO_EMPTY_CONTEXT_TTL_SECONDS', '1800'))
+LOCAL_FALLBACK_DAILY_BUDGET_DEFAULT = int(os.getenv('LOCAL_FALLBACK_DAILY_BUDGET', '2000'))
+LOCAL_READER_DAILY_BUDGET_DEFAULT = int(os.getenv('LOCAL_READER_DAILY_BUDGET', '1200'))
+LOCAL_FETCH_USER_AGENT = os.getenv(
+    'LOCAL_FETCH_USER_AGENT',
+    'Mozilla/5.0 (compatible; myPositionsBot/1.0; +https://example.com/bot)',
+)
+LOCAL_FETCH_TIMEOUT_SECONDS = int(os.getenv('LOCAL_FETCH_TIMEOUT_SECONDS', '15'))
 
 
 app = Flask(__name__)
@@ -62,6 +87,13 @@ metaso_quota_state = {
 }
 metaso_context_lock = threading.Lock()
 metaso_context_cache = {}
+local_fallback_quota_lock = threading.Lock()
+local_fallback_quota_state = {
+    'date': '',
+    'search_count': 0,
+    'reader_count': 0,
+    'last_log': '',
+}
 
 
 class User(db.Model):
@@ -1126,6 +1158,15 @@ def relevance_level_from_score(score: float):
     return 'none'
 
 
+def sentiment_label(sentiment: str | None):
+    normalized = (sentiment or '').strip().lower()
+    if normalized == 'bullish':
+        return '偏利好'
+    if normalized == 'bearish':
+        return '偏利空'
+    return '中性'
+
+
 def trading_now_flag():
     return is_trading_time_now()
 
@@ -1169,6 +1210,8 @@ def get_global_analysis_payload(news_id: str, legacy_analysis: NewsAnalysis | No
     status = 'success' if legacy_analysis else 'pending'
     prompt_version = 'legacy.v1'
     background_sources = []
+    impact_analysis = ''
+    watch_points = []
     sector_impacts = _normalize_sector_impacts([], sectors, sentiment)
 
     news_item = get_news_item_by_legacy_id(news_id)
@@ -1188,6 +1231,22 @@ def get_global_analysis_payload(news_id: str, legacy_analysis: NewsAnalysis | No
                 if isinstance(analysis_payload.get('backgroundSources'), list)
                 else background_sources
             )
+            if not background_sources and isinstance(analysis_payload.get('background_sources'), list):
+                background_sources = analysis_payload.get('background_sources')
+            impact_analysis = (
+                analysis_payload.get('impactAnalysis')
+                if isinstance(analysis_payload.get('impactAnalysis'), str)
+                else impact_analysis
+            )
+            if not impact_analysis and isinstance(analysis_payload.get('impact_analysis'), str):
+                impact_analysis = analysis_payload.get('impact_analysis')
+            watch_points = (
+                analysis_payload.get('watchPoints')
+                if isinstance(analysis_payload.get('watchPoints'), list)
+                else watch_points
+            )
+            if not watch_points and isinstance(analysis_payload.get('watch_points'), list):
+                watch_points = analysis_payload.get('watch_points')
             sentiment = modern.sentiment or sentiment
             impact_level = modern.impact_level or impact_level
             summary = modern.summary or summary
@@ -1203,6 +1262,58 @@ def get_global_analysis_payload(news_id: str, legacy_analysis: NewsAnalysis | No
     else:
         sector_impacts = _normalize_sector_impacts([], sectors, sentiment)
 
+    sector_labels = [item['sector'] for item in sector_impacts if isinstance(item, dict) and item.get('sector')]
+    sector_text = '、'.join(sector_labels[:3]) or '相关板块'
+
+    if not isinstance(background, str):
+        background = ''
+    background = background.strip()
+    if not background:
+        background = (
+            f"该事件主要影响{sector_text}，当前信息仍以快讯为主，"
+            "后续需结合官方公告、行业数据与成交结构确认影响持续性。"
+        )
+    elif len(background) < 120:
+        background = (
+            f"{background} 从传导路径看，市场通常先交易预期，再验证基本面，"
+            f"需结合{sector_text}近期资金流向、政策/供需变化与盘面成交确认影响强弱。"
+            "若后续缺乏增量信息，相关板块弹性可能回落。"
+        )[:280]
+
+    if not isinstance(impact_analysis, str):
+        impact_analysis = ''
+    impact_analysis = impact_analysis.strip()
+    if not impact_analysis:
+        impact_analysis = (
+            f"短线看，消息对{sector_text}情绪影响{sentiment_label(sentiment)}，"
+            "可能引发板块内部分化；中线需跟踪事件落地节奏、盈利传导和估值匹配度，"
+            "若兑现不及预期，存在情绪回撤风险。"
+        )
+    elif len(impact_analysis) < 120:
+        impact_analysis = (
+            f"{impact_analysis}\n\n"
+            f"产业链与中期变量方面，需继续验证{sector_text}的供需与盈利传导是否兑现，"
+            "并关注政策、资金与估值是否形成同向共振，防范预期过度交易后的回撤。"
+        )[:320]
+
+    if not isinstance(watch_points, list):
+        watch_points = []
+    watch_points = [str(item)[:60] for item in watch_points if isinstance(item, str) and item.strip()][:4]
+    if not watch_points:
+        watch_points = [
+            '观察板块成交额与主线持续性',
+            '跟踪后续公告与数据兑现进度',
+            '警惕预期过高后的回撤波动',
+        ]
+
+    if not isinstance(background_sources, list):
+        background_sources = []
+    background_sources = [
+        str(url).strip()
+        for url in background_sources
+        if isinstance(url, str) and str(url).strip().startswith(('http://', 'https://'))
+    ][:2]
+
     return {
         'newsId': news_id,
         'sectors': [item['sector'] for item in sector_impacts],
@@ -1212,7 +1323,9 @@ def get_global_analysis_payload(news_id: str, legacy_analysis: NewsAnalysis | No
         'impactLevel': impact_level or 'minor',
         'summary': summary or '',
         'background': background or '',
-        'backgroundSources': background_sources[:2],
+        'backgroundSources': background_sources,
+        'impactAnalysis': (impact_analysis or '')[:320],
+        'watchPoints': [str(item)[:60] for item in watch_points if isinstance(item, str) and item.strip()][:4],
         'tags': tags,
         'modelUsed': model_used or '',
         'analyzedAt': analyzed_at,
@@ -1962,8 +2075,49 @@ def metaso_high_impact_only():
     return str(raw).strip().lower() not in {'0', 'false', 'no', 'off'}
 
 
-def _metaso_acquire_call_slot(units: int = 1):
+def _parse_bool_value(raw, default: bool = False) -> bool:
+    if raw is None:
+        return default
+    return str(raw).strip().lower() not in {'0', 'false', 'no', 'off', ''}
+
+
+def local_fallback_enabled() -> bool:
+    raw = _get_ai_config('fallback_enabled', os.getenv('LOCAL_FALLBACK_ENABLED', 'true'))
+    return _parse_bool_value(raw, True)
+
+
+def get_local_fallback_daily_budget() -> int:
+    raw = _get_ai_config(
+        'fallback_daily_budget',
+        os.getenv('LOCAL_FALLBACK_DAILY_BUDGET', str(LOCAL_FALLBACK_DAILY_BUDGET_DEFAULT)),
+    )
+    try:
+        budget = int(str(raw).strip())
+    except (TypeError, ValueError):
+        budget = LOCAL_FALLBACK_DAILY_BUDGET_DEFAULT
+    return max(0, budget)
+
+
+def get_local_reader_daily_budget() -> int:
+    raw = _get_ai_config(
+        'fallback_reader_daily_budget',
+        os.getenv('LOCAL_READER_DAILY_BUDGET', str(LOCAL_READER_DAILY_BUDGET_DEFAULT)),
+    )
+    try:
+        budget = int(str(raw).strip())
+    except (TypeError, ValueError):
+        budget = LOCAL_READER_DAILY_BUDGET_DEFAULT
+    return max(0, budget)
+
+
+def background_enrichment_enabled() -> bool:
+    return metaso_enabled() or local_fallback_enabled()
+
+
+def _metaso_acquire_call_slot(units: int = 1, with_reason: bool = False):
     if units <= 0:
+        if with_reason:
+            return True, ''
         return True
 
     now_ts = time.time()
@@ -1976,6 +2130,8 @@ def _metaso_acquire_call_slot(units: int = 1):
             metaso_quota_state['last_log'] = ''
 
         if metaso_quota_state['disabled_until'] > now_ts:
+            if with_reason:
+                return False, 'quota'
             return False
 
         budget = get_metaso_daily_budget()
@@ -1983,15 +2139,21 @@ def _metaso_acquire_call_slot(units: int = 1):
             if metaso_quota_state['last_log'] != 'budget_zero':
                 print('[Metaso] disabled: metaso_daily_budget <= 0')
                 metaso_quota_state['last_log'] = 'budget_zero'
+            if with_reason:
+                return False, 'budget_zero'
             return False
 
         if metaso_quota_state['count'] + units > budget:
             if metaso_quota_state['last_log'] != 'budget_reached':
                 print(f'[Metaso] daily budget reached count={metaso_quota_state["count"]} budget={budget}')
                 metaso_quota_state['last_log'] = 'budget_reached'
+            if with_reason:
+                return False, 'quota'
             return False
 
         metaso_quota_state['count'] += units
+        if with_reason:
+            return True, ''
         return True
 
 
@@ -2005,6 +2167,42 @@ def _metaso_mark_quota_exhausted(reason: str = ''):
             suffix = f' reason={reason}' if reason else ''
             print(f'[Metaso] quota exhausted; cooling down {METASO_QUOTA_COOLDOWN_SECONDS}s{suffix}')
             metaso_quota_state['last_log'] = 'quota_exhausted'
+
+
+def _local_fallback_acquire_slot(slot: str, units: int = 1) -> bool:
+    if units <= 0:
+        return True
+    if slot not in {'search', 'reader'}:
+        return False
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    count_key = f'{slot}_count'
+    budget = get_local_fallback_daily_budget() if slot == 'search' else get_local_reader_daily_budget()
+
+    with local_fallback_quota_lock:
+        if local_fallback_quota_state['date'] != today:
+            local_fallback_quota_state['date'] = today
+            local_fallback_quota_state['search_count'] = 0
+            local_fallback_quota_state['reader_count'] = 0
+            local_fallback_quota_state['last_log'] = ''
+
+        if budget <= 0:
+            log_key = f'{slot}_budget_zero'
+            if local_fallback_quota_state['last_log'] != log_key:
+                print(f'[LocalFallback] {slot} disabled: budget <= 0')
+                local_fallback_quota_state['last_log'] = log_key
+            return False
+
+        current = local_fallback_quota_state[count_key]
+        if current + units > budget:
+            log_key = f'{slot}_budget_reached'
+            if local_fallback_quota_state['last_log'] != log_key:
+                print(f'[LocalFallback] {slot} daily budget reached count={current} budget={budget}')
+                local_fallback_quota_state['last_log'] = log_key
+            return False
+
+        local_fallback_quota_state[count_key] = current + units
+        return True
 
 
 def _metaso_cached_context_get(cache_key: str):
@@ -2050,12 +2248,19 @@ def extract_metaso_items(payload):
     return []
 
 
-def metaso_search(query: str, size: int = 4):
+def metaso_search(query: str, size: int = 4, with_reason: bool = False):
+    reason = ''
     key = get_metaso_api_key()
-    if not key or not query:
-        return []
-    if not _metaso_acquire_call_slot(1):
-        return []
+    if not key:
+        reason = 'metaso_disabled'
+        return ([], reason) if with_reason else []
+    if not query:
+        reason = 'empty_query'
+        return ([], reason) if with_reason else []
+    acquired, acquire_reason = _metaso_acquire_call_slot(1, with_reason=True)
+    if not acquired:
+        reason = acquire_reason or 'quota'
+        return ([], reason) if with_reason else []
 
     headers = {
         'Authorization': f'Bearer {key}',
@@ -2074,19 +2279,31 @@ def metaso_search(query: str, size: int = 4):
     try:
         resp = requests.post(METASO_SEARCH_URL, headers=headers, json=payload, timeout=20)
         resp.raise_for_status()
-        parsed = resp.json()
-        if isinstance(parsed, dict):
-            err_code = parsed.get('errCode', parsed.get('code'))
-            if err_code not in (None, 0, '0'):
-                err_msg = parsed.get('errMsg') or parsed.get('message') or ''
-                print(f'[Metaso] search api error code={err_code} msg={err_msg}')
-                if str(err_code) == '3000':
-                    _metaso_mark_quota_exhausted(err_msg)
-                return []
-        items = extract_metaso_items(parsed)
     except Exception as exc:
         print(f'[Metaso] search failed: {exc}')
-        return []
+        reason = 'http_error'
+        return ([], reason) if with_reason else []
+
+    try:
+        parsed = resp.json()
+    except ValueError as exc:
+        print(f'[Metaso] search parse failed: {exc}')
+        reason = 'parse_error'
+        return ([], reason) if with_reason else []
+
+    if isinstance(parsed, dict):
+        err_code = parsed.get('errCode', parsed.get('code'))
+        if err_code not in (None, 0, '0'):
+            err_msg = parsed.get('errMsg') or parsed.get('message') or ''
+            print(f'[Metaso] search api error code={err_code} msg={err_msg}')
+            if str(err_code) == '3000':
+                _metaso_mark_quota_exhausted(err_msg)
+                reason = 'quota'
+            else:
+                reason = 'api_error'
+            return ([], reason) if with_reason else []
+
+    items = extract_metaso_items(parsed)
 
     normalized = []
     seen_urls = set()
@@ -2103,15 +2320,24 @@ def metaso_search(query: str, size: int = 4):
             'snippet': (item.get('snippet') or item.get('summary') or item.get('description') or '').strip(),
         })
 
-    return normalized
+    if not normalized:
+        reason = 'empty_result'
+    return (normalized, reason) if with_reason else normalized
 
 
-def metaso_read_url(url: str, max_chars: int = 1200):
+def metaso_read_url(url: str, max_chars: int = 1200, with_reason: bool = False):
+    reason = ''
     key = get_metaso_api_key()
-    if not key or not url:
-        return ''
-    if not _metaso_acquire_call_slot(1):
-        return ''
+    if not key:
+        reason = 'metaso_disabled'
+        return ('', reason) if with_reason else ''
+    if not url:
+        reason = 'empty_url'
+        return ('', reason) if with_reason else ''
+    acquired, acquire_reason = _metaso_acquire_call_slot(1, with_reason=True)
+    if not acquired:
+        reason = acquire_reason or 'quota'
+        return ('', reason) if with_reason else ''
 
     headers = {
         'Authorization': f'Bearer {key}',
@@ -2124,10 +2350,169 @@ def metaso_read_url(url: str, max_chars: int = 1200):
         text_content = (resp.text or '').strip()
         if max_chars > 0 and len(text_content) > max_chars:
             text_content = text_content[:max_chars]
-        return text_content
+        if not text_content:
+            reason = 'empty_result'
+        return (text_content, reason) if with_reason else text_content
     except Exception as exc:
         print(f'[Metaso] reader failed for {url}: {exc}')
-        return ''
+        reason = 'http_error'
+        return ('', reason) if with_reason else ''
+
+
+def local_search_duckduckgo(query: str, size: int = 1, with_reason: bool = False):
+    reason = ''
+    if not local_fallback_enabled():
+        reason = 'disabled'
+        return ([], reason) if with_reason else []
+    if not query:
+        reason = 'empty_query'
+        return ([], reason) if with_reason else []
+    if DDGS is None:
+        reason = 'provider_unavailable'
+        print('[LocalFallback] duckduckgo-search is not installed')
+        return ([], reason) if with_reason else []
+    if not _local_fallback_acquire_slot('search', 1):
+        reason = 'quota'
+        return ([], reason) if with_reason else []
+
+    normalized = []
+    seen_urls = set()
+    query_text = query[:120]
+    max_results = max(1, min(size, 3))
+    try:
+        with DDGS() as ddgs:
+            items = list(ddgs.text(query_text, max_results=max_results))
+    except Exception as exc:
+        print(f'[LocalFallback] DDG search failed: {exc}')
+        reason = 'http_error'
+        return ([], reason) if with_reason else []
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        url = (item.get('href') or item.get('url') or item.get('link') or '').strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        normalized.append({
+            'title': (item.get('title') or '').strip(),
+            'url': url,
+            'snippet': (item.get('body') or item.get('snippet') or '').strip(),
+        })
+
+    if not normalized:
+        reason = 'empty_result'
+    return (normalized, reason) if with_reason else normalized
+
+
+def local_read_url(url: str, max_chars: int = 900, with_reason: bool = False):
+    reason = ''
+    if not local_fallback_enabled():
+        reason = 'disabled'
+        return ('', reason) if with_reason else ''
+    if not url:
+        reason = 'empty_url'
+        return ('', reason) if with_reason else ''
+    if not _local_fallback_acquire_slot('reader', 1):
+        reason = 'quota'
+        return ('', reason) if with_reason else ''
+
+    headers = {
+        'User-Agent': LOCAL_FETCH_USER_AGENT,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=LOCAL_FETCH_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        html_text = resp.text or ''
+
+        text_content = ''
+        if trafilatura is not None:
+            try:
+                extracted = trafilatura.extract(
+                    html_text,
+                    url=url,
+                    include_comments=False,
+                    include_tables=False,
+                    favor_precision=True,
+                )
+                text_content = (extracted or '').strip()
+            except Exception as exc:
+                print(f'[LocalFallback] trafilatura failed for {url}: {exc}')
+
+        if not text_content:
+            if BeautifulSoup is not None:
+                soup = BeautifulSoup(html_text, 'html.parser')
+                for tag in soup(['script', 'style', 'noscript']):
+                    tag.decompose()
+                text_content = soup.get_text('\n')
+            else:
+                text_content = re.sub(r'<[^>]+>', ' ', html_text)
+
+        text_content = re.sub(r'\s+', ' ', (text_content or '')).strip()
+        if max_chars > 0 and len(text_content) > max_chars:
+            text_content = text_content[:max_chars]
+        if not text_content:
+            reason = 'empty_result'
+        return (text_content, reason) if with_reason else text_content
+    except Exception as exc:
+        print(f'[LocalFallback] reader failed for {url}: {exc}')
+        reason = 'http_error'
+        return ('', reason) if with_reason else ''
+
+
+def _build_background_payload_from_search_results(search_results: list[dict], read_url_fn):
+    sources = []
+    evidence = []
+    for entry in search_results[:1]:
+        url = entry.get('url') or ''
+        snippet = (entry.get('snippet') or '').strip()
+        title_text = (entry.get('title') or '').strip()
+        evidence_text = snippet
+        if len((evidence_text or '').strip()) < METASO_READER_MIN_SNIPPET:
+            evidence_text = (read_url_fn(url, max_chars=900) or snippet).strip()
+        if evidence_text:
+            evidence.append({
+                'title': title_text,
+                'url': url,
+                'text': evidence_text[:900],
+            })
+        if url:
+            sources.append({
+                'title': title_text,
+                'url': url,
+                'snippet': snippet[:280],
+            })
+    return {
+        'sources': sources[:2],
+        'evidence': evidence[:2],
+    }
+
+
+def build_local_background_context(news_item: dict, with_reason: bool = False):
+    title = (news_item.get('title') or '').strip()
+    content = (news_item.get('content') or '').strip()
+    query = title[:120] if title else content[:120]
+    if not query:
+        payload = {'sources': [], 'evidence': []}
+        return (payload, 'empty_query') if with_reason else payload
+
+    search_results, search_reason = local_search_duckduckgo(query, size=1, with_reason=True)
+    if not search_results:
+        payload = {'sources': [], 'evidence': []}
+        return (payload, search_reason or 'empty_result') if with_reason else payload
+
+    payload = _build_background_payload_from_search_results(search_results, local_read_url)
+    reason = ''
+    if not payload.get('sources') and not payload.get('evidence'):
+        reason = 'empty_result'
+    return (payload, reason) if with_reason else payload
+
+
+def _should_trigger_local_fallback(metaso_reason: str) -> bool:
+    if not local_fallback_enabled():
+        return False
+    return metaso_reason in {'metaso_disabled', 'quota', 'budget_zero', 'http_error', 'parse_error', 'api_error'}
 
 
 def build_news_background_context(news_item: dict):
@@ -2141,36 +2526,43 @@ def build_news_background_context(news_item: dict):
     if isinstance(cached_payload, dict):
         return cached_payload
 
-    search_results = metaso_search(query, size=1)
-    if not search_results:
-        payload = {'sources': [], 'evidence': []}
-        _metaso_cached_context_set(cache_key, payload, METASO_EMPTY_CONTEXT_TTL_SECONDS)
-        return payload
+    payload = {'sources': [], 'evidence': []}
+    provider = 'none'
+    fail_reason = ''
 
-    sources = []
-    evidence = []
-    for entry in search_results[:1]:
-        url = entry.get('url') or ''
-        snippet = entry.get('snippet') or ''
-        title_text = entry.get('title') or ''
-        evidence_text = snippet
-        if len((evidence_text or '').strip()) < METASO_READER_MIN_SNIPPET:
-            raw_text = metaso_read_url(url, max_chars=900)
-            evidence_text = raw_text or snippet
-        if evidence_text:
-            evidence.append({
-                'title': title_text,
-                'url': url,
-                'text': evidence_text[:900],
-            })
-        sources.append({
-            'title': title_text,
-            'url': url,
-            'snippet': snippet[:280],
-        })
+    metaso_results, metaso_reason = metaso_search(query, size=1, with_reason=True)
+    if metaso_results:
+        payload = _build_background_payload_from_search_results(metaso_results, metaso_read_url)
+        if payload.get('sources') or payload.get('evidence'):
+            provider = 'metaso'
+        else:
+            fail_reason = 'empty_result'
+    else:
+        fail_reason = metaso_reason or 'empty_result'
 
-    payload = {'sources': sources, 'evidence': evidence}
-    ttl = METASO_CONTEXT_CACHE_TTL_SECONDS if sources or evidence else METASO_EMPTY_CONTEXT_TTL_SECONDS
+    if provider != 'metaso' and _should_trigger_local_fallback(fail_reason):
+        local_payload, local_reason = build_local_background_context(news_item, with_reason=True)
+        if local_payload.get('sources') or local_payload.get('evidence'):
+            payload = local_payload
+            provider = 'local-ddg'
+            fail_reason = ''
+        else:
+            payload = local_payload
+            if local_reason:
+                fail_reason = f'{fail_reason}|local_{local_reason}' if fail_reason else f'local_{local_reason}'
+
+    if provider == 'none' and not fail_reason:
+        fail_reason = 'empty_result'
+
+    ttl = (
+        METASO_CONTEXT_CACHE_TTL_SECONDS
+        if payload.get('sources') or payload.get('evidence')
+        else METASO_EMPTY_CONTEXT_TTL_SECONDS
+    )
+    print(
+        f'[BackgroundContext] provider={provider} fail_reason={(fail_reason or "none")} '
+        f'news_id={news_item.get("news_id", "")}'
+    )
     _metaso_cached_context_set(cache_key, payload, ttl)
     return payload
 
@@ -2296,15 +2688,27 @@ def _build_rule_based_layer1_results(news_items: list[dict], background_context_
         evidence = context_payload.get('evidence', [])
         background_text = ''
         if evidence:
-            background_text = (evidence[0].get('text') or '').replace('\n', ' ').strip()[:120]
+            background_text = (evidence[0].get('text') or '').replace('\n', ' ').strip()[:220]
         if not background_text:
-            background_text = (content[:120] if content else '') or '暂无补充背景。'
+            background_text = (content[:180] if content else '') or '暂无补充背景。'
         summary = title[:40] if title else (content[:40] if content else '暂无摘要')
         sentiment = analyze_sentiment(merged_text) or 'neutral'
         impact_level = _infer_impact_level(merged_text)
         sectors = _infer_sectors(merged_text)
         sector_impacts = _normalize_sector_impacts([], sectors, sentiment)
         background_sources = [entry.get('url', '') for entry in context_payload.get('sources', []) if entry.get('url')]
+        sector_text = '、'.join([item['sector'] for item in sector_impacts][:3]) or '相关板块'
+        impact_analysis = (
+            f"短期情绪：该消息对{sector_text}的市场预期影响{sentiment_label(sentiment)}，"
+            "盘中通常先反映在成交与板块联动强度上，若缺乏后续增量信息，情绪驱动可能衰减。\n\n"
+            f"产业链与中期：需跟踪事件在{sector_text}的传导路径，包括供需、政策与盈利兑现节奏；"
+            "若兑现不及预期，存在估值回撤与交易拥挤反身性风险。"
+        )
+        watch_points = [
+            '观察盘中成交额与板块联动强度',
+            '关注后续公告或数据兑现情况',
+            '警惕预期过高后的回撤风险',
+        ]
 
         results.append({
             'news_id': news_id,
@@ -2316,6 +2720,8 @@ def _build_rule_based_layer1_results(news_items: list[dict], background_context_
             'summary': summary,
             'background': background_text,
             'background_sources': background_sources[:2],
+            'impact_analysis': impact_analysis[:300],
+            'watch_points': watch_points[:3],
             'tags': _infer_tags(merged_text),
             '_model': 'rules-fallback',
             '_tokens': 0,
@@ -2326,6 +2732,38 @@ def _build_rule_based_layer1_results(news_items: list[dict], background_context_
     return results
 
 
+def news_global_prompt_v3() -> tuple[str, str]:
+    prompt = """你是一位专业的中国A股市场金融分析师。请分析以下财经新闻，对每条新闻提取结构化信息。
+
+对每条新闻，请返回以下JSON格式：
+{
+  "news_id": "原始ID",
+  "sector_impacts": [{"sector": "受影响板块", "polarity": "bullish|bearish|neutral"}],
+  "sectors": ["受影响板块（可选，若给出需与sector_impacts一致）"],
+  "sentiment": "bullish|bearish|neutral",
+  "impact_level": "major|moderate|minor",
+  "summary": "一句话摘要（20~40字）",
+  "background": "背景补充（120~220字，包含历史背景/关键数据/上下文）",
+  "impact_analysis": "两段分析文本：第一段写短期情绪与盘面反馈，第二段写产业链传导、竞争格局与中长期变量（总长140~280字）",
+  "watch_points": ["观察要点1", "观察要点2", "观察要点3"],
+  "background_sources": ["用于背景补充的URL，可为空数组"],
+  "tags": ["政策|财报|数据|行业|国际|其他"]
+}
+
+硬性规则：
+- 只输出板块，不输出具体个股代码、个股推荐、目标价或买卖指令。
+- impact_analysis 必须是“两个自然段”，段间用换行分隔：
+  - 第一段聚焦：短期情绪、资金偏好、盘面弹性。
+  - 第二段聚焦：产业链传导、竞争格局变化、兑现节奏与主要风险变量。
+- 若新闻信息量不足，需明确“不确定性”和“待验证变量”，不能写成确定性结论。
+- watch_points 最多3条，每条不超过24字，强调后续可观测变量。
+- background_sources 仅返回确实使用过的URL，最多2条。
+- 如果新闻与A股无关，sentiment=neutral，impact_level=minor。
+
+请以JSON数组格式返回所有分析结果，不要包含其他文字。"""
+    return prompt, 'builtin.news_global.v3'
+
+
 def analyze_news_layer1(news_items: list[dict]) -> list[dict]:
     """
     Run Layer 1 global analysis on a batch of news items.
@@ -2333,18 +2771,18 @@ def analyze_news_layer1(news_items: list[dict]) -> list[dict]:
     """
     model = _get_ai_config('ai_model_fast', os.getenv('AI_MODEL_FAST', 'gpt-4o-mini'))
 
-    # Build batch prompt (with optional metaso background context)
+    # Build batch prompt (with optional background context: metaso -> local fallback)
     news_text = ""
     background_context_by_news_id = {}
     for i, item in enumerate(news_items):
         title = (item.get('title') or '')[:180]
         content = (item.get('content') or '')[:800]
         news_id = item.get('news_id')
-        should_use_metaso = False
-        if metaso_enabled():
+        should_enrich_background = False
+        if background_enrichment_enabled():
             estimated_impact = _infer_impact_level(f'{title} {content}'.strip())
-            should_use_metaso = (not metaso_high_impact_only()) or estimated_impact == 'major'
-        context_payload = build_news_background_context(item) if should_use_metaso else {'sources': [], 'evidence': []}
+            should_enrich_background = (not metaso_high_impact_only()) or estimated_impact == 'major'
+        context_payload = build_news_background_context(item) if should_enrich_background else {'sources': [], 'evidence': []}
         if news_id:
             background_context_by_news_id[str(news_id)] = context_payload
 
@@ -2368,33 +2806,7 @@ def analyze_news_layer1(news_items: list[dict]) -> list[dict]:
     if not get_ai_runtime_config():
         return _build_rule_based_layer1_results(news_items, background_context_by_news_id, 'missing_client')
 
-    fallback_prompt = """你是一位专业的中国A股市场金融分析师。请分析以下财经新闻，对每条新闻提取结构化信息。
-
-对每条新闻，请返回以下JSON格式：
-{
-  "news_id": "原始ID",
-  "sector_impacts": [{"sector": "受影响板块", "polarity": "bullish|bearish|neutral"}],
-  "sectors": ["受影响板块（可选，若给出需与sector_impacts一致）"],
-  "sentiment": "bullish|bearish|neutral",
-  "impact_level": "major|moderate|minor",
-  "summary": "一句话总结（30字以内）",
-  "background": "补充背景信息（80字以内，可为空）",
-  "background_sources": ["用于背景补充的URL，可为空数组"],
-  "tags": ["政策|财报|数据|行业|国际|其他"]
-}
-
-规则：
-- sectors: 提取新闻涉及的A股板块，如"白酒"、"半导体"、"新能源"、"医药"、"银行"等
-- 只输出板块，不输出具体个股代码或个股建议
-- sector_impacts: 给出每个板块的利好/利空/中性判断
-- sentiment: 对市场/相关板块的情绪判断
-- impact_level: major=重大政策/突发事件, moderate=行业动态, minor=一般资讯
-- 如果给出了“联网背景候选”，优先结合候选生成background；如果没提供候选可基于通识补充。
-- background_sources 必须返回你确实使用过的 URL，最多2条。
-- 如果新闻与A股无关（如娱乐、体育），sentiment设为neutral，impact_level设为minor
-
-请以JSON数组格式返回所有分析结果，不要包含其他文字。"""
-    system_prompt, prompt_version = current_prompt('news_global', fallback_prompt)
+    system_prompt, prompt_version = news_global_prompt_v3()
 
     try:
         ai_output = call_ai_text(
@@ -2427,6 +2839,37 @@ def analyze_news_layer1(news_items: list[dict]) -> list[dict]:
                 model_sources = []
             if not model_sources:
                 model_sources = [entry.get('url', '') for entry in background_context.get('sources', []) if entry.get('url')]
+
+            background_text = (r.get('background') or '').strip()
+            if background_text:
+                r['background'] = background_text[:320]
+
+            impact_analysis = r.get('impact_analysis')
+            if not isinstance(impact_analysis, str) or not impact_analysis.strip():
+                impact_analysis = (
+                    f"短期情绪：该消息对相关板块情绪影响{sentiment_label(r.get('sentiment'))}，"
+                    "需结合量能、盘口强弱与资金偏好确认持续性。\n\n"
+                    "中期传导：重点跟踪政策/供需/盈利兑现链条，若后续数据与预期背离，"
+                    "可能触发估值回撤与交易拥挤风险释放。"
+                )
+            r['impact_analysis'] = impact_analysis.strip()[:320]
+
+            watch_points = r.get('watch_points')
+            if not isinstance(watch_points, list):
+                watch_points = []
+            cleaned_watch_points = [
+                str(item).strip()[:60]
+                for item in watch_points
+                if isinstance(item, str) and item.strip()
+            ][:4]
+            if not cleaned_watch_points:
+                cleaned_watch_points = [
+                    '观察成交与板块联动是否持续',
+                    '关注后续公告或数据兑现',
+                    '警惕情绪回落导致波动放大',
+                ]
+            r['watch_points'] = cleaned_watch_points
+
             r['_model'] = f'{model}@{ai_output["endpoint"]}'
             r['_tokens'] = token_count // len(news_items) if news_items else 0
             r['_prompt_version'] = prompt_version
@@ -2928,6 +3371,19 @@ def send_webhook_message(
         return False
 
 
+def get_user_webhook_cooldown_seconds(user_id: int, fallback_minutes: int | None):
+    endpoint = (
+        NotificationEndpoint.query
+        .filter_by(user_id=user_id, channel_type='webhook', enabled=True)
+        .order_by(NotificationEndpoint.updated_at.desc())
+        .first()
+    )
+    if endpoint and endpoint.cooldown_sec:
+        return max(NEWS_MIN_COOLDOWN_SECONDS, int(endpoint.cooldown_sec))
+    fallback_seconds = int((fallback_minutes or 5) * 60)
+    return max(NEWS_MIN_COOLDOWN_SECONDS, fallback_seconds)
+
+
 portfolio_queue: 'queue.Queue[tuple[int, str]]' = queue.Queue()
 portfolio_pending: set[str] = set()
 
@@ -2946,10 +3402,13 @@ def fetch_fund_portfolio_codes(fund_code: str):
         response = requests.get(url, timeout=15)
         response.raise_for_status()
         data = response.json()
-        if data.get('Datas', {}).get('ETFCODE'):
+        if not isinstance(data, dict):
+            return []
+        datas = data.get('Datas') if isinstance(data.get('Datas'), dict) else {}
+        if datas.get('ETFCODE'):
             return fetch_fund_portfolio_codes(data['Datas']['ETFCODE'])
-        if data.get('ErrCode') == 0 and data.get('Datas', {}).get('fundStocks'):
-            return [item.get('GPJC') for item in data['Datas']['fundStocks'] if item.get('GPJC')]
+        if data.get('ErrCode') == 0 and datas.get('fundStocks'):
+            return [item.get('GPJC') for item in datas['fundStocks'] if isinstance(item, dict) and item.get('GPJC')]
     except Exception as exc:
         print(f"[Backend] Portfolio fetch error for {fund_code}: {exc}")
     return []
@@ -3028,84 +3487,105 @@ def news_worker():
                     raw_json = json.dumps(news, ensure_ascii=False)
                     content_hash = build_content_hash(title, content)
 
-                    cached = NewsCache.query.filter_by(news_id=news_id).first()
-                    if not cached:
-                        cached = NewsCache(
-                            news_id=news_id,
-                            title=title,
-                            content=content,
-                            brief=brief,
-                            ctime=ctime,
-                            raw_json=raw_json,
+                    try:
+                        with db.session.begin_nested():
+                            cached = NewsCache.query.filter_by(news_id=news_id).first()
+                            if not cached:
+                                cached = NewsCache(
+                                    news_id=news_id,
+                                    title=title,
+                                    content=content,
+                                    brief=brief,
+                                    ctime=ctime,
+                                    raw_json=raw_json,
+                                )
+                                db.session.add(cached)
+
+                            news_item = NewsItem.query.filter_by(source='cls', external_id=news_id).first()
+                            if not news_item:
+                                news_item = NewsItem.query.filter_by(content_hash=content_hash).first()
+                            if not news_item:
+                                news_item = NewsItem(
+                                    source='cls',
+                                    external_id=news_id,
+                                    title=title,
+                                    content=content,
+                                    brief=brief,
+                                    published_at=published_at,
+                                    raw_payload=raw_json,
+                                    content_hash=content_hash,
+                                    lang='zh-CN',
+                                    status='active',
+                                )
+                                db.session.add(news_item)
+                                db.session.flush()
+
+                            event = NewsEvent.query.filter_by(event_key=content_hash).first()
+                            if not event:
+                                event = NewsEvent(
+                                    event_key=content_hash,
+                                    title=title[:255],
+                                    event_type='telegraph',
+                                    importance='normal',
+                                    first_seen_at=published_at,
+                                    last_seen_at=published_at,
+                                )
+                                db.session.add(event)
+                                db.session.flush()
+                            else:
+                                event.last_seen_at = max(event.last_seen_at or published_at, published_at)
+
+                            relation = NewsEventItem.query.filter_by(event_id=event.id, news_id=news_item.id).first()
+                            if not relation:
+                                relation = NewsEventItem(
+                                    event_id=event.id,
+                                    news_id=news_item.id,
+                                    is_primary=True,
+                                )
+                                db.session.add(relation)
+
+                            has_job = AnalysisJob.query.filter_by(job_type='global_news', news_id=news_id).filter(
+                                AnalysisJob.status.in_(['pending', 'running', 'success'])
+                            ).first()
+                            if not has_job:
+                                db.session.add(AnalysisJob(
+                                    job_type='global_news',
+                                    news_id=news_id,
+                                    priority=5,
+                                    status='pending',
+                                    scheduled_at=datetime.utcnow(),
+                                    payload_json=json.dumps({'source': 'cls'}, ensure_ascii=False),
+                                ))
+
+                        # Keep in-memory queue as low-latency fallback
+                        if not NewsAnalysis.query.filter_by(news_id=news_id).first():
+                            analysis_queue.put(news_id)
+                    except IntegrityError as exc:
+                        print(
+                            f"[Backend] News worker skip duplicate news_id={news_id} "
+                            f"content_hash={content_hash} error={exc.__class__.__name__}"
                         )
-                        db.session.add(cached)
-
-                    news_item = NewsItem.query.filter_by(source='cls', external_id=news_id).first()
-                    if not news_item:
-                        news_item = NewsItem(
-                            source='cls',
-                            external_id=news_id,
-                            title=title,
-                            content=content,
-                            brief=brief,
-                            published_at=published_at,
-                            raw_payload=raw_json,
-                            content_hash=content_hash,
-                            lang='zh-CN',
-                            status='active',
-                        )
-                        db.session.add(news_item)
-                        db.session.flush()
-
-                    event = NewsEvent.query.filter_by(event_key=content_hash).first()
-                    if not event:
-                        event = NewsEvent(
-                            event_key=content_hash,
-                            title=title[:255],
-                            event_type='telegraph',
-                            importance='normal',
-                            first_seen_at=published_at,
-                            last_seen_at=published_at,
-                        )
-                        db.session.add(event)
-                        db.session.flush()
-                    else:
-                        event.last_seen_at = max(event.last_seen_at or published_at, published_at)
-
-                    relation = NewsEventItem.query.filter_by(event_id=event.id, news_id=news_item.id).first()
-                    if not relation:
-                        relation = NewsEventItem(
-                            event_id=event.id,
-                            news_id=news_item.id,
-                            is_primary=True,
-                        )
-                        db.session.add(relation)
-
-                    has_job = AnalysisJob.query.filter_by(job_type='global_news', news_id=news_id).filter(
-                        AnalysisJob.status.in_(['pending', 'running', 'success'])
-                    ).first()
-                    if not has_job:
-                        db.session.add(AnalysisJob(
-                            job_type='global_news',
-                            news_id=news_id,
-                            priority=5,
-                            status='pending',
-                            scheduled_at=datetime.utcnow(),
-                            payload_json=json.dumps({'source': 'cls'}, ensure_ascii=False),
-                        ))
-
-                    # Keep in-memory queue as low-latency fallback
-                    if not NewsAnalysis.query.filter_by(news_id=news_id).first():
-                        analysis_queue.put(news_id)
+                        continue
+                    except Exception as item_exc:
+                        print(f"[Backend] News worker skip invalid item news_id={news_id}: {item_exc}")
+                        continue
 
                 db.session.commit()
 
                 # Step 2: proactive webhook push based on analyzed results
                 configs = WebhookConfig.query.filter_by(enabled=True).all()
                 for config in configs:
-                    cooldown = config.interval_minutes * 60 if config.interval_minutes else 0
+                    cooldown = get_user_webhook_cooldown_seconds(config.user_id, config.interval_minutes)
                     for news in reversed(news_items):
                         news_id = str(news.get('id', news.get('ctime')))
+                        news_ctime = int(news.get('ctime', 0) or 0)
+                        if news_ctime > 0:
+                            news_age_seconds = int(time.time()) - news_ctime
+                            if news_age_seconds > NEWS_PUSH_MAX_AGE_SECONDS:
+                                continue
+                        if config.last_sent_time and news_ctime > 0:
+                            if news_ctime <= int(config.last_sent_time.timestamp()):
+                                continue
                         exists = SentNews.query.filter_by(user_id=config.user_id, news_id=news_id).first()
                         if exists:
                             continue
@@ -3119,14 +3599,15 @@ def news_worker():
                         match_scope = relevance_payload.get('matchScope', 'none')
                         highlight = relevance_score > 0 and match_scope != 'none'
 
-                        if config.holdings_only and match_scope not in {'holding', 'mixed'}:
-                            continue
-
                         should_notify = False
                         if config.holdings_only:
                             should_notify = should_trigger_personalized_insight(relevance, analysis)
+                            if not should_notify and not relevance:
+                                # 兜底：当相关度尚未产出或基金关键词冷启动失败时，
+                                # 仍允许中高影响新闻进入推送，避免“已启用但长期无消息”。
+                                should_notify = analysis.impact_level in {'major', 'moderate'}
                         else:
-                            should_notify = analysis.impact_level == 'major'
+                            should_notify = analysis.impact_level in {'major', 'moderate'}
                         if not should_notify:
                             continue
 
@@ -3262,13 +3743,21 @@ def analysis_worker():
                 if global_jobs and ai_enabled:
                     news_batch = []
                     for job in global_jobs:
+                        payload = parse_json_text(job.payload_json, {})
+                        force_reanalyze = False
+                        if isinstance(payload, dict):
+                            force_reanalyze = (
+                                payload.get('force_reanalyze') in (True, 'true', '1', 1)
+                                or payload.get('forceReanalyze') in (True, 'true', '1', 1)
+                                or payload.get('trigger') in {'manual_rerun_rich_background', 'manual_targeted_rerun'}
+                            )
                         cached = NewsCache.query.filter_by(news_id=job.news_id).first()
                         if not cached:
                             job.status = 'failed'
                             job.error_message = 'news not found'
                             job.finished_at = datetime.utcnow()
                             continue
-                        if NewsAnalysis.query.filter_by(news_id=job.news_id).first():
+                        if NewsAnalysis.query.filter_by(news_id=job.news_id).first() and not force_reanalyze:
                             job.status = 'success'
                             job.finished_at = datetime.utcnow()
                             continue
@@ -3319,6 +3808,11 @@ def analysis_worker():
                             tags = result.get('tags', [])
                             summary = result.get('summary', '')
                             background = result.get('background', '')
+                            impact_analysis = (result.get('impact_analysis') or '').strip()[:320]
+                            watch_points = result.get('watch_points')
+                            if not isinstance(watch_points, list):
+                                watch_points = []
+                            watch_points = [str(item)[:60] for item in watch_points if isinstance(item, str) and item.strip()][:4]
                             background_sources = result.get('background_sources')
                             if not isinstance(background_sources, list):
                                 background_sources = result.get('_background_sources', [])
@@ -3362,6 +3856,8 @@ def analysis_worker():
                                         'sectorImpacts': sector_impacts,
                                         'tags': tags,
                                         'backgroundSources': background_sources[:2],
+                                        'impactAnalysis': impact_analysis,
+                                        'watchPoints': watch_points,
                                     }, ensure_ascii=False),
                                     status='success',
                                     analyzed_at=datetime.utcnow(),
@@ -3539,7 +4035,7 @@ def ensure_notification_endpoint_from_legacy(user_id: int):
         endpoint_url=legacy.url,
         secret_ciphertext=legacy.secret,
         enabled=bool(legacy.enabled),
-        cooldown_sec=max(60, int((legacy.interval_minutes or 5) * 60)),
+        cooldown_sec=max(NEWS_MIN_COOLDOWN_SECONDS, int((legacy.interval_minutes or 5) * 60)),
         quiet_hours=json.dumps({}, ensure_ascii=False),
     )
     db.session.add(endpoint)
@@ -3554,11 +4050,15 @@ def sync_legacy_webhook_from_endpoint(user_id: int, endpoint: NotificationEndpoi
         db.session.add(legacy)
 
     if endpoint:
+        was_enabled = bool(legacy.enabled)
+        previous_url = legacy.url or ''
         legacy.url = endpoint.endpoint_url
         legacy.secret = endpoint.secret_ciphertext
         legacy.enabled = bool(endpoint.enabled)
         legacy.holdings_only = True
         legacy.interval_minutes = max(1, int((endpoint.cooldown_sec or 300) / 60))
+        if legacy.enabled and (not was_enabled or previous_url != (endpoint.endpoint_url or '') or not legacy.last_sent_time):
+            legacy.last_sent_time = datetime.utcnow()
     else:
         legacy.enabled = False
 
@@ -4083,7 +4583,7 @@ def update_webhook():
     endpoint.endpoint_url = config.url
     endpoint.secret_ciphertext = config.secret
     endpoint.enabled = bool(config.enabled)
-    endpoint.cooldown_sec = max(60, int((config.interval_minutes or 5) * 60))
+    endpoint.cooldown_sec = max(NEWS_MIN_COOLDOWN_SECONDS, int((config.interval_minutes or 5) * 60))
     endpoint.updated_at = datetime.utcnow()
 
     db.session.commit()
@@ -4344,7 +4844,7 @@ def put_notification_endpoints():
         row.channel_type = (item.get('channelType') or row.channel_type or 'webhook').strip()
         row.endpoint_url = (item.get('endpointUrl') or '').strip()
         row.enabled = bool(item.get('enabled', row.enabled))
-        row.cooldown_sec = max(60, int(item.get('cooldownSec') or row.cooldown_sec or 300))
+        row.cooldown_sec = max(NEWS_MIN_COOLDOWN_SECONDS, int(item.get('cooldownSec') or row.cooldown_sec or 300))
         quiet_hours = item.get('quietHours', {})
         if isinstance(quiet_hours, dict):
             row.quiet_hours = json.dumps(quiet_hours, ensure_ascii=False)
@@ -4599,6 +5099,12 @@ def admin_ai_config_payload():
         'highImpactOnly': metaso_high_impact_only(),
         'quotaCooldownSeconds': METASO_QUOTA_COOLDOWN_SECONDS,
     }
+    payload['fallback'] = {
+        'enabled': local_fallback_enabled(),
+        'provider': 'duckduckgo',
+        'dailyBudget': get_local_fallback_daily_budget(),
+        'readerDailyBudget': get_local_reader_daily_budget(),
+    }
     payload['stats'] = {
         'pendingJobs': AnalysisJob.query.filter(AnalysisJob.status == 'pending').count(),
         'runningJobs': AnalysisJob.query.filter(AnalysisJob.status == 'running').count(),
@@ -4632,6 +5138,11 @@ def put_admin_ai_config():
         'defaultModels': parse_json_text(provider.default_models, {}),
         'enabled': bool(provider.enabled),
         'metasoApiKeyMasked': mask_secret(get_metaso_api_key()),
+        'fallback': {
+            'enabled': local_fallback_enabled(),
+            'dailyBudget': get_local_fallback_daily_budget(),
+            'readerDailyBudget': get_local_reader_daily_budget(),
+        },
     }
 
     if 'baseUrl' in data:
@@ -4654,6 +5165,32 @@ def put_admin_ai_config():
     if data.get('metasoHighImpactOnly') is not None:
         _set_ai_config('metaso_high_impact_only', 'true' if bool(data.get('metasoHighImpactOnly')) else 'false')
 
+    fallback_data = data.get('fallback') if isinstance(data.get('fallback'), dict) else {}
+    fallback_enabled_value = data.get('fallbackEnabled')
+    if fallback_enabled_value is None and 'enabled' in fallback_data:
+        fallback_enabled_value = fallback_data.get('enabled')
+    fallback_daily_budget_value = data.get('fallbackDailyBudget')
+    if fallback_daily_budget_value is None and 'dailyBudget' in fallback_data:
+        fallback_daily_budget_value = fallback_data.get('dailyBudget')
+    fallback_reader_daily_budget_value = data.get('fallbackReaderDailyBudget')
+    if fallback_reader_daily_budget_value is None and 'readerDailyBudget' in fallback_data:
+        fallback_reader_daily_budget_value = fallback_data.get('readerDailyBudget')
+
+    if fallback_enabled_value is not None:
+        _set_ai_config('fallback_enabled', 'true' if _parse_bool_value(fallback_enabled_value, True) else 'false')
+    if fallback_daily_budget_value is not None:
+        try:
+            budget = max(0, int(fallback_daily_budget_value))
+            _set_ai_config('fallback_daily_budget', str(budget))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'fallbackDailyBudget 非法'}), 400
+    if fallback_reader_daily_budget_value is not None:
+        try:
+            budget = max(0, int(fallback_reader_daily_budget_value))
+            _set_ai_config('fallback_reader_daily_budget', str(budget))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'fallbackReaderDailyBudget 非法'}), 400
+
     models = parse_json_text(provider.default_models, {})
     if isinstance(data.get('defaultModels'), dict):
         models.update(data.get('defaultModels'))
@@ -4672,6 +5209,11 @@ def put_admin_ai_config():
         'defaultModels': models,
         'enabled': bool(provider.enabled),
         'metasoApiKeyMasked': mask_secret(get_metaso_api_key()),
+        'fallback': {
+            'enabled': local_fallback_enabled(),
+            'dailyBudget': get_local_fallback_daily_budget(),
+            'readerDailyBudget': get_local_reader_daily_budget(),
+        },
     }
     save_audit_log('admin.ai_config.update', 'ai_provider_config', provider.provider, before, after)
     db.session.commit()
@@ -4987,6 +5529,11 @@ def update_ai_config():
         'defaultModels': parse_json_text(provider.default_models, {}),
         'enabled': bool(provider.enabled),
         'metasoApiKeyMasked': mask_secret(get_metaso_api_key()),
+        'fallback': {
+            'enabled': local_fallback_enabled(),
+            'dailyBudget': get_local_fallback_daily_budget(),
+            'readerDailyBudget': get_local_reader_daily_budget(),
+        },
     }
 
     base_url = payload.get('ai_base_url') or payload.get('baseUrl')
@@ -5003,6 +5550,22 @@ def update_ai_config():
     metaso_high_impact_only_value = payload.get('metaso_high_impact_only')
     if metaso_high_impact_only_value is None:
         metaso_high_impact_only_value = payload.get('metasoHighImpactOnly')
+    fallback_enabled_value = payload.get('fallback_enabled')
+    if fallback_enabled_value is None:
+        fallback_enabled_value = payload.get('fallbackEnabled')
+    fallback_daily_budget = payload.get('fallback_daily_budget')
+    if fallback_daily_budget is None:
+        fallback_daily_budget = payload.get('fallbackDailyBudget')
+    fallback_reader_daily_budget = payload.get('fallback_reader_daily_budget')
+    if fallback_reader_daily_budget is None:
+        fallback_reader_daily_budget = payload.get('fallbackReaderDailyBudget')
+    fallback_payload = payload.get('fallback') if isinstance(payload.get('fallback'), dict) else {}
+    if fallback_enabled_value is None and 'enabled' in fallback_payload:
+        fallback_enabled_value = fallback_payload.get('enabled')
+    if fallback_daily_budget is None and 'dailyBudget' in fallback_payload:
+        fallback_daily_budget = fallback_payload.get('dailyBudget')
+    if fallback_reader_daily_budget is None and 'readerDailyBudget' in fallback_payload:
+        fallback_reader_daily_budget = fallback_payload.get('readerDailyBudget')
 
     if isinstance(base_url, str):
         provider.base_url = base_url.strip()
@@ -5025,6 +5588,20 @@ def update_ai_config():
     if metaso_high_impact_only_value is not None:
         enabled = metaso_high_impact_only_value in ('true', True, '1', 1)
         _set_ai_config('metaso_high_impact_only', 'true' if enabled else 'false')
+    if fallback_enabled_value is not None:
+        _set_ai_config('fallback_enabled', 'true' if _parse_bool_value(fallback_enabled_value, True) else 'false')
+    if fallback_daily_budget is not None:
+        try:
+            budget = max(0, int(fallback_daily_budget))
+            _set_ai_config('fallback_daily_budget', str(budget))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'fallback_daily_budget 非法'}), 400
+    if fallback_reader_daily_budget is not None:
+        try:
+            budget = max(0, int(fallback_reader_daily_budget))
+            _set_ai_config('fallback_reader_daily_budget', str(budget))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'fallback_reader_daily_budget 非法'}), 400
 
     models = parse_json_text(provider.default_models, {})
     if model_fast:
@@ -5051,6 +5628,11 @@ def update_ai_config():
             'defaultModels': models,
             'enabled': bool(provider.enabled),
             'metasoApiKeyMasked': mask_secret(get_metaso_api_key()),
+            'fallback': {
+                'enabled': local_fallback_enabled(),
+                'dailyBudget': get_local_fallback_daily_budget(),
+                'readerDailyBudget': get_local_reader_daily_budget(),
+            },
         },
     )
     db.session.commit()

@@ -4,6 +4,7 @@ import { IconDeleteStroked, IconPlusCircleStroked } from '@douyinfe/semi-icons'
 import type { WatchlistWithEstimation } from '@/types'
 import { formatChangePercent, formatMoney, parseEstimation } from '@/services'
 import './WatchlistTable.css'
+import './ModalActionBar.css'
 
 interface WatchlistTableProps {
   items: WatchlistWithEstimation[]
@@ -170,7 +171,10 @@ export function WatchlistTable({ items, onRemove, onConvert }: WatchlistTablePro
           visible={true}
           onCancel={() => setConvertingId(null)}
           footer={null}
-          width={440}
+          motion={false}
+          width="min(440px, calc(100vw - 24px))"
+          centered
+          bodyStyle={{ maxHeight: '72vh', overflowY: 'auto' }}
         >
           <div className="watchlist-convert-form">
             <label>
@@ -193,7 +197,7 @@ export function WatchlistTable({ items, onRemove, onConvert }: WatchlistTablePro
                 style={{ width: '100%' }}
               />
             </label>
-            <div className="watchlist-convert-actions">
+            <div className="modal-action-bar compact watchlist-convert-actions">
               <Button onClick={() => setConvertingId(null)} disabled={submitting}>取消</Button>
               <Button theme="solid" loading={submitting} onClick={handleSubmitConvert}>
                 确认建仓

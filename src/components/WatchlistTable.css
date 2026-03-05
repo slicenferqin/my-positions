@@ -150,13 +150,6 @@
   color: var(--semi-color-text-2);
 }
 
-.watchlist-convert-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 6px;
-}
-
 @media (max-width: 900px) {
   .watchlist-table-container {
     background: transparent;
